@@ -1,6 +1,6 @@
 # Configuración efectiva y capacidades de AgentInstance — propuesta CTX-P3 / CTX-P4
 
-**Estado:** propuesta de diseño para revisión del usuario; CTX-P3 y CTX-P4 todavía no están aprobados como contratos cerrados.  
+**Estado:** CTX-P3 y CTX-P4 aprobados como dirección y contrato conceptual por el usuario el 05/11/2026. Los detalles de autorización, identidad de servicio y persistencia siguen pendientes de definición en sus fases correspondientes.  
 **Fecha:** 05/11/2026.  
 **Fase:** WAB-78 — diseño objetivo y contratos.  
 **No autoriza:** cambios de código, schemas, permisos, datos ni inicio de WAB-79/WAB-80.
@@ -26,6 +26,7 @@ Esta propuesta también incorpora dos principios de producto aprobados:
 |---|---|---|---|
 | Políticas obligatorias de plataforma | Waby | Seguridad, límites de producto, aislamiento, confidencialidad y restricciones globales | No |
 | Configuración de runtime de plataforma | Waby | Proveedor LLM, modelo, credenciales, límites máximos y capacidades globales disponibles | No |
+| Plan y entitlement de agentes IA | Organización | Plan contratado y habilitación comercial de funcionalidades de agentes IA | Se modifica mediante la administración del plan de la Organización; no configura las AgentInstances |
 | AgentDefinition versionada | Waby | Propósito/base del agente, instrucciones centrales, defaults y conjunto máximo de funcionalidades disponibles | No modifica la definición; solo configura su instancia dentro de los límites permitidos |
 | AgentInstance | Workspace (una configuración por agente) | Personalización empresarial, instrucciones propias, reglas de negocio, Skills seleccionadas/configuradas y preferencias permitidas | Sí, mediante usuarios autorizados del Workspace |
 | Knowledge | Workspace | Documentos y bases de conocimiento de la empresa; acceso efectivo seleccionado para la instancia | La instancia no cambia la propiedad; un usuario autorizado administra Knowledge del Workspace y lo asigna/autoriza a sus agentes |
@@ -118,15 +119,17 @@ La siguiente matriz define responsabilidades de producto; **no aprueba nombres d
 | Crear, versionar y publicar AgentDefinition | Waby | Plataforma |
 | Elegir proveedor/modelo, gestionar credenciales LLM y límites globales | Waby | Plataforma |
 | Mantener políticas obligatorias y catálogo de capabilities/Skills estándar | Waby | Plataforma |
-| Crear/administrar conexiones y credenciales de una integración | Administrador autorizado de la Organización | Organización |
-| Registrar/publicar operaciones de una integración | Administrador autorizado de la Organización | Organización |
+| Administrar el plan que habilita la funcionalidad de agentes IA | Administrador de la Organización | Organización |
+| Crear/administrar conexiones y credenciales de una integración | Actor administrador pendiente de definición; el recurso pertenece a la Organización | Organización |
+| Registrar/publicar operaciones de una integración | Actor administrador pendiente de definición; el catálogo pertenece a la Organización | Organización |
 | Crear una AgentInstance desde una definición disponible | Usuario autorizado del Workspace, con provisioning controlado por Waby | Workspace |
 | Personalizar instrucciones y Rules empresariales de la instancia | Usuario autorizado del Workspace | AgentInstance |
 | Seleccionar Knowledge disponible para la instancia | Usuario autorizado del Workspace, dentro del Knowledge de su Workspace | Workspace → AgentInstance |
 | Habilitar Skills/opciones publicadas permitidas | Usuario autorizado del Workspace | AgentInstance |
 | Habilitar operaciones de integración para una AgentInstance | Usuario autorizado del Workspace | Workspace + AgentInstance |
-| Ejecutar una Capability | Runtime de Waby con identidad técnica acotada | Organización + Workspace + AgentInstance + Execution |
+| Ejecutar una Capability | Runtime de Waby con identidad técnica acotada y contexto validado de tenant | Organización + Workspace + AgentInstance + Execution |
 | Cambiar permisos, roles, miembros o estructura del Workspace | Usuario humano autorizado; nunca la AgentInstance | Workspace/Organización |
+| Administrar miembros, invitar usuarios o modificar roles/permisos | Usuario humano autorizado conforme al modelo actual; nunca una AgentInstance | Workspace/Organización |
 
 ### Restricciones derivadas de D2
 
@@ -136,7 +139,7 @@ La siguiente matriz define responsabilidades de producto; **no aprueba nombres d
 - El runtime de una AgentInstance no hereda roles humanos. La identidad técnica debe recibir únicamente el contexto y las operaciones necesarias para esa ejecución.
 - La matriz final debe resolver ARQ-03, ARQ-19, ARQ-20 y ARQ-21; ARQ-13/ARQ-14 siguen como bloqueos preexistentes referenciados, no duplicados.
 
-Los nombres y mecanismos concretos de permisos, ownership T3 y service identity deben validarse en WAB-80 sobre la base de este contrato. No se modifica el enum ni se crea un segundo sistema de permisos en WAB-78.
+Los nombres y mecanismos concretos de permisos, ownership T3 y service identity deben validarse en WAB-80 sobre la base de este contrato. La identidad técnica de cada ejecución debe portar y validar como mínimo `organizationId`, `workspaceId` y `agentInstanceId`, comprobando la relación AgentInstance → Workspace → Organización antes de leer datos o ejecutar operaciones. No se modifica el enum ni se crea un segundo sistema de permisos en WAB-78.
 
 ## 7. Experiencia simple de configuración
 
@@ -155,12 +158,18 @@ Las Skills avanzadas, integraciones, operaciones, límites especializados y conf
 
 La interfaz no debe exponer los nombres técnicos de capas, hashes, versiones, providers, esquemas ni permisos. Sí debe explicar de forma simple qué puede hacer el agente y qué datos podrá consultar o modificar.
 
-## 8. Decisiones que esta propuesta necesita confirmar
+## 8. Acuerdos de producto y contratos aprobados
 
-1. **Precedencia del prompt:** aceptar que las instrucciones propias de la empresa se agregan al bloque base y no reemplazan el núcleo/políticas de Waby.
-2. **Selección inicial de Skills:** aceptar que AgentDefinition puede recomendar Skills, pero la selección que queda habilitada en AgentInstance la decide expresamente el usuario autorizado del Workspace. No se activan Skills por el solo hecho de figurar como default/recomendación ni se incorporan automáticamente a instancias existentes por cambios posteriores del catálogo.
-3. **Skills empresariales:** confirmar que las empresas pueden definir procedimientos propios para cada instancia, separados de las Skills estándar que Waby mantiene; dichos procedimientos no conceden por sí solos permisos/capabilities.
-4. **Autoridad humana:** confirmar que un usuario autorizado del Workspace puede crear y configurar su AgentInstance desde una definición publicada, mientras Waby conserva las operaciones exclusivas de plataforma y el provisioning técnico. El permiso exacto no se decide aquí.
+1. **Precedencia y composición (CTX-P3 / CTX-P4):** las políticas obligatorias y la configuración de plataforma de Waby prevalecen; AgentDefinition establece la base del agente; AgentInstance agrega personalización empresarial permitida; el contexto de ejecución aporta datos y no adquiere autoridad de instrucciones. Los conflictos se resuelven determinísticamente, no delegándolos al LLM.
+2. **Instrucciones y Rules empresariales:** se agregan como bloques propios y no reemplazan el núcleo ni las políticas de Waby. No se ofrece un `systemPromptOverride` libre.
+3. **Selección de Skills:** AgentDefinition puede recomendar Skills, pero el usuario autorizado del Workspace decide cuáles habilita. Publicar una Skill nueva o incorporarla a recomendaciones no la activa automáticamente. Las mejoras compatibles de una Skill ya habilitada se actualizan automáticamente bajo el rollout gestionado por Waby; el cliente puede recibir un aviso informativo y no administra versiones.
+4. **Procedimientos empresariales:** cada AgentInstance puede disponer de procedimientos/instrucciones propios, separados del catálogo de Skills estándar de Waby. No son código ejecutable ni conceden permisos/capabilities. Su representación persistente exacta se definirá en WAB-79.
+5. **Administración de AgentInstance:** un usuario autorizado del Workspace puede crear y configurar una instancia desde una AgentDefinition publicada. Waby conserva el provisioning y las operaciones técnicas de plataforma. La habilitación comercial de agentes IA depende del plan de la Organización, administrado por su administrador.
+6. **Integraciones por instancia:** un usuario autorizado del Workspace decide qué operaciones registradas y disponibles para su Organización se habilitan para cada AgentInstance. La pertenencia a la Organización no convierte al administrador de Organización en responsable de configurar la instancia.
+7. **Límites de la AgentInstance:** nunca administra usuarios, invita miembros, modifica membresías, roles, permisos ni estructura de la Organización/Workspace.
+8. **Identidad y ámbito:** toda ejecución actúa dentro de una Organización, un Workspace y una AgentInstance concretos. Waby valida la cadena de ownership y las autorizaciones en backend/runtime; no se confía en IDs aportados por el LLM ni en un token interno sin contexto de tenant.
+
+**Pendientes técnicos relacionados:** resolver ARQ-03, ARQ-19, ARQ-20 y ARQ-21 con una matriz operación × actor × alcance y un mecanismo de identidad de servicio válido. La definición de permisos concretos, provisioning y controles de servicio se implementará/detallará en WAB-80. El actor autorizado para administrar conexiones/credenciales/catálogo de integraciones de ámbito Organización queda pendiente y no debe inferirse automáticamente del rol de administrador de Organización.
 
 ## 9. Fuera de alcance / no reabrir
 
