@@ -1,6 +1,6 @@
 # Catálogo de agentes y Skills estándar de Waby
 
-**Estado:** dirección de producto aprobada para mantener catálogos centrales; política de versionado, actualización y rollout propuesta, pendiente de confirmación; contratos de dominio y UX detallados pendientes dentro de WAB-78.  
+**Estado:** dirección de producto aprobada para mantener catálogos centrales y política general acordada para actualizar automáticamente Skills ya habilitadas; contratos detallados de releases, avisos, rollout, dominio y UX siguen pendientes dentro de WAB-78.  
 **Fecha:** 05/11/2026.  
 **Alcance:** catálogo central de configuraciones iniciales de agentes y catálogo reutilizable de Skills estándar. No define todavía pantallas finales ni esquemas persistentes.
 
@@ -35,7 +35,7 @@ Una entrada del catálogo de agentes (basada en una AgentDefinition versionada y
 - Nombre, categoría, propósito y descripción comprensible.
 - Instrucciones base y comportamiento esperado.
 - Rules centrales, distinguiendo las obligatorias de las personalizables.
-- Referencias a versiones concretas de Skills estándar, clasificadas como incluidas por defecto o recomendadas.
+- Referencias a Skills estándar recomendadas o disponibles para habilitar. La experiencia de configuración debe dejar claro cuáles activa el usuario; las recomendaciones no equivalen a habilitación automática.
 - Capacidades compatibles o requeridas, siempre sujetas a autorización independiente.
 - Campos de personalización que el usuario puede completar (por ejemplo, tono, idioma, políticas comerciales o información de atención).
 - Sugerencias sobre el tipo de Knowledge que conviene cargar.
@@ -64,12 +64,14 @@ Una misma Skill puede ser referenciada por varias configuraciones de agente. No 
 ### Versionado y personalización
 
 - Las Skills estándar son administradas por Waby. Cada release publicada es inmutable y se conserva para trazabilidad, pruebas, auditoría y rollback seguro.
-- AgentDefinition referencia Skills por identidad estable y declara si se incluyen por defecto o se recomiendan; no obliga al cliente a administrar números de versión.
+- AgentDefinition referencia Skills por identidad estable y puede recomendarlas o presentarlas como opciones. El usuario autorizado del Workspace decide cuáles habilita; una recomendación o una nueva entrada en el catálogo no activa una Skill por sí sola.
 - AgentInstance conserva qué Skills tiene habilitadas y su configuración empresarial permitida. Waby resuelve la release vigente según el canal de actualización gestionado.
-- Las actualizaciones compatibles se distribuyen automáticamente mediante rollout controlado, sin exigir intervención técnica del cliente y sin sobrescribir sus personalizaciones.
+- Las mejoras compatibles de una Skill ya habilitada se distribuyen automáticamente mediante rollout controlado, sin exigir intervención técnica ni aprobación individual del cliente y sin sobrescribir sus personalizaciones. Waby puede mostrar un aviso informativo con el cambio aplicado.
+- Una Skill nueva, o una Skill incorporada posteriormente a las recomendaciones de una AgentDefinition, no se habilita automáticamente en instancias existentes. Se informa como opción y requiere que el usuario decida habilitarla.
 - P10 registra en cada ejecución la release exacta de Skill utilizada. Las ejecuciones anteriores conservan su snapshot; las siguientes pueden utilizar la release estable promovida por Waby.
 - Las actualizaciones de seguridad pueden bloquear/revocar releases vulnerables y prevalecen sobre la continuidad de versiones anteriores.
 - La empresa puede agregar procedimientos o instrucciones propios. Se distinguen de las Skills estándar, se revisan/versionan internamente como parte de la configuración de instancia y no se convierten en código ejecutable ni conceden permisos por sí mismos.
+- Una actualización que cambie sustancialmente el propósito o alcance de una Skill no se trata como una mejora compatible de la misma Skill: debe gestionarse como una nueva opción o un cambio de configuración que requiera decisión explícita.
 
 La política operativa completa (autoría, pruebas, aprobación, rollout, rollback, retirada y seguridad) está en [Plan de administración y evolución del catálogo](./plan-administracion-catalogo-waby.md).
 
@@ -124,9 +126,9 @@ Se debe conservar solo la información operativa necesaria para explicar la deci
 
 - El catálogo de agentes organiza la experiencia por objetivos de negocio.
 - El catálogo de Skills ofrece procedimientos reutilizables.
-- Una configuración de agente puede recomendar, incluir o permitir habilitar Skills estándar.
+- Una configuración de agente puede recomendar y ofrecer Skills estándar; el usuario autorizado decide cuáles habilita.
 - Una Skill puede utilizarse en varias configuraciones.
-- La AgentInstance conserva las versiones concretas que utiliza.
+- La AgentInstance conserva la selección y configuración empresarial de Skills; P10 registra la release exacta utilizada en cada ejecución.
 - Las capacidades ejecutables se autorizan de manera independiente; una Skill no concede acceso a herramientas, datos ni integraciones.
 
 ## 6. Experiencia de usuario prevista
@@ -147,7 +149,7 @@ Las opciones avanzadas y las integraciones se ofrecen cuando tienen sentido, nun
 
 - Este documento registra la dirección de producto aprobada, no un catálogo inicial cerrado ni el número definitivo de categorías/Skills.
 - Falta definir el ciclo editorial y de publicación del catálogo Waby, responsables, pruebas, compatibilidad y retiro de versiones.
-- Falta definir cuáles Skills son incluidas por defecto, recomendadas u opcionales por plantilla.
+- Falta definir cómo se presentan las Skills recomendadas/disponibles durante la configuración inicial y cómo se comunican las nuevas opciones sin habilitarlas automáticamente.
 - Falta precisar el modelo de procedimientos empresariales propios y su versionado.
 - Falta diseñar los umbrales, señales, explicaciones y controles configurables para la detección de malestar.
 - Falta diseñar la política exacta para transferencia automática versus recomendación/confirmación, coordinada con P2 y permisos.
