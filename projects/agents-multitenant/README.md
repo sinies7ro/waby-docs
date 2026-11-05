@@ -9,6 +9,12 @@ Documentación del proyecto de arquitectura y evolución del sistema de agentes 
 - Contratos de dominio, runtime, contexto, aislamiento y persistencia.
 - Planes de implementación y criterios de aceptación.
 
+## Diseño objetivo
+
+- [Configuración efectiva y capacidades de AgentInstance — propuesta CTX-P3 / CTX-P4](./design/configuracion-efectiva-y-capacidades.md) (pendiente de aprobación).
+- [Experiencia de configuración de agentes — principios de producto](./design/experiencia-configuracion-agentes.md) (principios aprobados; diseño visual pendiente).
+- [Integraciones API externas](./design/integraciones-api-externas.md) (ownership aprobado; contratos técnicos pendientes).
+
 ## Documentación WAB-78
 
 El conjunto de informes y material de revisión de la Fase 2 está centralizado en [Auditorías WAB-78](./audits/wab-78/README.md). El índice registra los ocho documentos migrados y sus fuentes originales de Dropbox.
