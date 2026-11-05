@@ -14,6 +14,8 @@
 
 La capacidad de invocar APIs configuradas por el cliente no equivale a navegación libre por Internet ni habilita conocimiento externo general. El agente solo puede operar sobre integraciones y operaciones registradas y autorizadas expresamente.
 
+**Carácter opcional:** una AgentInstance puede funcionar sin ninguna integración externa. Una empresa que no tenga ERP ni otros sistemas conectables puede crear y utilizar un agente únicamente con sus instrucciones, Knowledge y demás recursos que aporte a Waby. Las integraciones amplían capacidades cuando existe una necesidad concreta; no son un requisito de configuración, activación ni funcionamiento. La experiencia de conexión debe estar guiada y no exigir que el usuario conozca APIs o conceptos técnicos. Ver [Experiencia de configuración de agentes](./experiencia-configuracion-agentes.md).
+
 ## 2. Modelo conceptual propuesto
 
 | Concepto | Ownership / alcance | Responsabilidad |
