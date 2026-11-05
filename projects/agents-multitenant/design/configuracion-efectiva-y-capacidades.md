@@ -30,7 +30,7 @@ Esta propuesta también incorpora dos principios de producto aprobados:
 | AgentDefinition versionada | Waby | Propósito/base del agente, instrucciones centrales, defaults y conjunto máximo de funcionalidades disponibles | No modifica la definición; solo configura su instancia dentro de los límites permitidos |
 | AgentInstance | Workspace (una configuración por agente) | Personalización empresarial, instrucciones propias, reglas de negocio, Skills seleccionadas/configuradas y preferencias permitidas | Sí, mediante usuarios autorizados del Workspace |
 | Knowledge | Workspace | Documentos y bases de conocimiento de la empresa; acceso efectivo seleccionado para la instancia | La instancia no cambia la propiedad; un usuario autorizado administra Knowledge del Workspace y lo asigna/autoriza a sus agentes |
-| Integraciones | Organización | Conexiones externas, credenciales y catálogo de operaciones | No desde la instancia; el Workspace solo habilita operaciones autorizadas |
+| Integraciones de AgentInstance | Workspace / AgentInstance | Conexión externa, referencia segura a credenciales y operaciones configuradas/habilitadas para esa instancia | Sí, por usuarios autorizados del Workspace, dentro de los conectores y controles de Waby |
 | Contexto de ejecución | Runtime | Mensajes, historial, memoria y fragmentos RAG recuperados | No es configuración mutable de la instancia durante una ejecución |
 
 ## 3. Precedencia determinista propuesta (CTX-P4)
@@ -102,11 +102,12 @@ La exposición de capacidades debe resultar de la intersección de todas las aut
 
 `CapabilitiesEffective = PlatformAllowed ∩ DefinitionAllowed ∩ InstanceEnabled ∩ CurrentAuthorization`
 
-Para operaciones de integración se agrega la condición de ownership y grant:
-- Integración y credenciales pertenecen a la Organización.
-- La operación debe estar registrada y activa en esa Integración.
-- El Workspace debe habilitar esa operación para la AgentInstance concreta.
-- Waby vuelve a validar el grant y el estado antes de ejecutar; el LLM no puede llamar directamente a una URL ni construir HTTP arbitrario.
+Para operaciones de integración se agrega la condición de ownership y autorización por instancia:
+- La configuración de conexión, la referencia segura a credenciales y las operaciones disponibles se asocian a la AgentInstance y quedan dentro del Workspace propietario.
+- Un usuario autorizado del Workspace configura, prueba, habilita, modifica o revoca esa conexión y sus operaciones para la instancia concreta.
+- Waby mantiene los tipos de conectores y ejecutores soportados, protege los secretos y valida endpoint, esquema, argumentos, destino y límites. La configuración del cliente no equivale a código ejecutable ni habilita HTTP arbitrario.
+- La Organización aporta el ámbito superior de tenancy y su plan determina la disponibilidad comercial de agentes IA; el administrador de Organización no administra la conexión de una AgentInstance por el mero hecho de ser administrador.
+- Waby valida la cadena Organización → Workspace → AgentInstance y la autorización vigente antes de ejecutar; el LLM no puede seleccionar otro tenant, conexión ni URL arbitraria.
 
 Una Capability no se habilita por el mero hecho de que una Skill la mencione. El prompt no es un mecanismo de autorización.
 
@@ -119,9 +120,9 @@ La siguiente matriz define responsabilidades de producto; **no aprueba nombres d
 | Crear, versionar y publicar AgentDefinition | Waby | Plataforma |
 | Elegir proveedor/modelo, gestionar credenciales LLM y límites globales | Waby | Plataforma |
 | Mantener políticas obligatorias y catálogo de capabilities/Skills estándar | Waby | Plataforma |
-| Administrar el plan que habilita la funcionalidad de agentes IA | Administrador de la Organización | Organización |
-| Crear/administrar conexiones y credenciales de una integración | Actor administrador pendiente de definición; el recurso pertenece a la Organización | Organización |
-| Registrar/publicar operaciones de una integración | Actor administrador pendiente de definición; el catálogo pertenece a la Organización | Organización |
+| Administrar el plan que habilita la creación/uso de agentes IA | Administrador de la Organización | Organización |
+| Configurar conexión externa y credenciales de una AgentInstance | Usuario autorizado del Workspace | Workspace + AgentInstance |
+| Definir/seleccionar, habilitar, modificar o revocar operaciones para una AgentInstance | Usuario autorizado del Workspace | Workspace + AgentInstance |
 | Crear una AgentInstance desde una definición disponible | Usuario autorizado del Workspace, con provisioning controlado por Waby | Workspace |
 | Personalizar instrucciones y Rules empresariales de la instancia | Usuario autorizado del Workspace | AgentInstance |
 | Seleccionar Knowledge disponible para la instancia | Usuario autorizado del Workspace, dentro del Knowledge de su Workspace | Workspace → AgentInstance |
@@ -165,11 +166,11 @@ La interfaz no debe exponer los nombres técnicos de capas, hashes, versiones, p
 3. **Selección de Skills:** AgentDefinition puede recomendar Skills, pero el usuario autorizado del Workspace decide cuáles habilita. Publicar una Skill nueva o incorporarla a recomendaciones no la activa automáticamente. Las mejoras compatibles de una Skill ya habilitada se actualizan automáticamente bajo el rollout gestionado por Waby; el cliente puede recibir un aviso informativo y no administra versiones.
 4. **Procedimientos empresariales:** cada AgentInstance puede disponer de procedimientos/instrucciones propios, separados del catálogo de Skills estándar de Waby. No son código ejecutable ni conceden permisos/capabilities. Su representación persistente exacta se definirá en WAB-79.
 5. **Administración de AgentInstance:** un usuario autorizado del Workspace puede crear y configurar una instancia desde una AgentDefinition publicada. Waby conserva el provisioning y las operaciones técnicas de plataforma. La habilitación comercial de agentes IA depende del plan de la Organización, administrado por su administrador.
-6. **Integraciones por instancia:** un usuario autorizado del Workspace decide qué operaciones registradas y disponibles para su Organización se habilitan para cada AgentInstance. La pertenencia a la Organización no convierte al administrador de Organización en responsable de configurar la instancia.
+6. **Integraciones por instancia:** un usuario autorizado del Workspace configura la conexión externa, administra sus credenciales de forma segura y define/selecciona qué operaciones quedan disponibles para esa AgentInstance, dentro de los conectores y controles soportados por Waby. El plan de la Organización habilita comercialmente la funcionalidad de agentes IA, pero no convierte al administrador de Organización en responsable de configurar las instancias.
 7. **Límites de la AgentInstance:** nunca administra usuarios, invita miembros, modifica membresías, roles, permisos ni estructura de la Organización/Workspace.
 8. **Identidad y ámbito:** toda ejecución actúa dentro de una Organización, un Workspace y una AgentInstance concretos. Waby valida la cadena de ownership y las autorizaciones en backend/runtime; no se confía en IDs aportados por el LLM ni en un token interno sin contexto de tenant.
 
-**Pendientes técnicos relacionados:** resolver ARQ-03, ARQ-19, ARQ-20 y ARQ-21 con una matriz operación × actor × alcance y un mecanismo de identidad de servicio válido. La definición de permisos concretos, provisioning y controles de servicio se implementará/detallará en WAB-80. El actor autorizado para administrar conexiones/credenciales/catálogo de integraciones de ámbito Organización queda pendiente y no debe inferirse automáticamente del rol de administrador de Organización.
+**Pendientes técnicos relacionados:** resolver ARQ-03, ARQ-19, ARQ-20 y ARQ-21 con una matriz operación × actor × alcance y un mecanismo de identidad de servicio válido. La definición de permisos concretos, provisioning y controles de servicio se implementará/detallará en WAB-80. Permanecen por definir el flujo UX/técnico para configurar credenciales, los mecanismos de autenticación admitidos, cómo se definen/importan operaciones, las validaciones de destino/esquema y si en el futuro se permitirá compartir explícitamente una conexión entre varias AgentInstances del mismo Workspace. La configuración inicial se considera privada de cada AgentInstance.
 
 ## 9. Fuera de alcance / no reabrir
 
