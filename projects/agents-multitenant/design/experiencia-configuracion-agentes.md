@@ -39,7 +39,18 @@ La experiencia inicial debe cubrir el caso común y mantener las capacidades ava
 - La conexión de APIs e integraciones se ofrece como una capacidad opcional; no debe aparecer como requisito ni como paso obligatorio para terminar la configuración.
 - Cuando el usuario habilite una capacidad avanzada, Waby debe guiarlo y explicar qué información necesita, por qué la necesita y qué podrá hacer el agente después.
 
-## 2. Recorrido básico de referencia
+## 2. Catálogo de agentes y Skills estándar
+
+Waby debe ofrecer dos catálogos centrales para que el usuario no tenga que diseñar un agente desde cero:
+
+- **Catálogo de agentes:** configuraciones iniciales por objetivo empresarial, por ejemplo Atención, Ventas, Soporte y Legal. Cada opción explica qué hace, qué puede resolver y qué información conviene aportar.
+- **Catálogo de Skills estándar:** procedimientos reutilizables, como calificar una oportunidad de venta, clasificar consultas, detectar señales de malestar, resumir conversaciones o preparar una transferencia a una persona.
+
+Una configuración de agente puede incluir algunas Skills por defecto y recomendar otras. El usuario puede comprender para qué sirve cada una y habilitar las que necesite sin conocer términos técnicos. Las Skills estándar son mantenidas y versionadas por Waby; los procedimientos propios de la empresa se mantienen diferenciados y no otorgan permisos ejecutables.
+
+Las categorías y ejemplos iniciales se describen en [Catálogo de agentes y Skills estándar](./catalogo-agentes-y-skills-estandar.md). Son puntos de partida, no una lista cerrada.
+
+## 3. Recorrido básico de referencia
 
 Este recorrido expresa la intención de producto, no una secuencia de pantallas aprobada:
 
@@ -53,7 +64,7 @@ Este recorrido expresa la intención de producto, no una secuencia de pantallas 
 
 Un usuario debe poder completar este recorrido sin registrar una integración externa.
 
-## 3. Cómo presentar las integraciones
+## 4. Cómo presentar las integraciones
 
 Las integraciones son extensiones opcionales del agente, no una condición para que exista.
 
@@ -67,7 +78,7 @@ Las integraciones son extensiones opcionales del agente, no una condición para 
 
 La Organización sigue siendo propietaria de las integraciones; cada Workspace decide qué operaciones habilita para sus AgentInstances, conforme al documento [Integraciones API externas](./integraciones-api-externas.md).
 
-## 4. Separación entre simplicidad de UX y rigor interno
+## 5. Separación entre simplicidad de UX y rigor interno
 
 La simplicidad visible no implica reducir los controles internos.
 
@@ -83,7 +94,7 @@ Waby debe conservar, aunque no exponga complejidad innecesaria al usuario:
 
 La interfaz explica el resultado y las decisiones relevantes; Waby se responsabiliza de los mecanismos técnicos.
 
-## 5. Criterios para evaluar futuras propuestas de UX
+## 6. Criterios para evaluar futuras propuestas de UX
 
 Una propuesta de pantalla, flujo o configuración debe poder responder afirmativamente:
 
@@ -97,7 +108,7 @@ Una propuesta de pantalla, flujo o configuración debe poder responder afirmativ
 
 Si una propuesta obliga a configurar integraciones, escribir prompts técnicos o entender conceptos de infraestructura para crear un agente básico, no cumple estos principios.
 
-## 6. Pendiente de diseño
+## 7. Pendiente de diseño
 
 Estos principios están aprobados, pero siguen pendientes de elaboración dentro del diseño de producto:
 
