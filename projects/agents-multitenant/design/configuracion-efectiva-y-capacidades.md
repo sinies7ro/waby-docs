@@ -78,6 +78,8 @@ Separar Skill de Capability:
 
 La propuesta de versionado es un catálogo Waby de Skills publicadas e inmutables. Una configuración de AgentInstance referencia `skillId` + `skillVersionId` y contiene su estado/configuración permitida. Esto permite que cada instancia tenga su propio conjunto habilitado y parámetros sin duplicar el contenido/versionado del catálogo.
 
+**Catálogo y configuraciones iniciales:** Waby mantiene un catálogo de configuraciones de agente por objetivo empresarial (por ejemplo, Atención, Ventas, Soporte y Legal). Cada AgentDefinition versionada puede referenciar Skills estándar concretas, marcadas como incluidas por defecto o recomendadas. El cliente no crea una AgentDefinition ni un catálogo técnico; selecciona una configuración inicial y personaliza su AgentInstance. El contenido funcional de estos catálogos se desarrolla en [Catálogo de agentes y Skills estándar](./catalogo-agentes-y-skills-estandar.md).
+
 **Punto por confirmar:** la dirección de producto previa indica que cada empresa debe tener Skills propias. Para conservar esa personalización sin perder control de versiones, se propone admitir procedimientos empresariales propios asociados a la AgentInstance, separados de las Skills estándar publicadas por Waby. No deben convertirse en código ejecutable ni ampliar capabilities automáticamente. La representación exacta (Skill empresarial versionada o instrucciones/procedimientos de instancia) sigue pendiente de aprobación.
 
 ### 4.4 Defaults y cambios de AgentDefinition
@@ -138,12 +140,13 @@ Los nombres y mecanismos concretos de permisos, ownership T3 y service identity 
 El usuario no necesita conocer las capas internas descritas en este documento.
 
 Flujo básico propuesto:
-1. Elegir para qué necesita el agente, con ejemplos y plantillas.
-2. Definir nombre y datos básicos.
-3. Agregar documentos/conocimiento de su empresa.
-4. Personalizar el comportamiento mediante preguntas y opciones claras.
-5. Probarlo con ejemplos de conversación.
-6. Activarlo.
+1. Elegir una configuración del catálogo por objetivo (por ejemplo, Atención, Ventas, Soporte o Legal).
+2. Revisar qué hace el agente y qué Skills estándar incluye o recomienda.
+3. Definir nombre y datos básicos.
+4. Agregar documentos/conocimiento de su empresa.
+5. Personalizar el comportamiento mediante preguntas y opciones claras.
+6. Probarlo con ejemplos de conversación.
+7. Activarlo.
 
 Las Skills avanzadas, integraciones, operaciones, límites especializados y configuraciones técnicas aparecen opcionalmente cuando el usuario decide ampliar el agente. Sin ERP ni integraciones, el agente debe funcionar normalmente con Knowledge e instrucciones propias.
 
