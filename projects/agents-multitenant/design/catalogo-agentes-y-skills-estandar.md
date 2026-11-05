@@ -1,6 +1,6 @@
 # Catálogo de agentes y Skills estándar de Waby
 
-**Estado:** dirección de producto aprobada; contratos de dominio y UX detallados pendientes dentro de WAB-78.  
+**Estado:** dirección de producto aprobada para mantener catálogos centrales; política de versionado, actualización y rollout propuesta, pendiente de confirmación; contratos de dominio y UX detallados pendientes dentro de WAB-78.  
 **Fecha:** 05/11/2026.  
 **Alcance:** catálogo central de configuraciones iniciales de agentes y catálogo reutilizable de Skills estándar. No define todavía pantallas finales ni esquemas persistentes.
 
