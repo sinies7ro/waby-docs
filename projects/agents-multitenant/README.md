@@ -15,7 +15,7 @@ Documentación del proyecto de arquitectura y evolución del sistema de agentes 
 - [Experiencia de configuración de agentes — principios de producto](./design/experiencia-configuracion-agentes.md) (principios aprobados; diseño visual pendiente).
 - [Catálogo de agentes y Skills estándar](./design/catalogo-agentes-y-skills-estandar.md) (dirección de producto aprobada; contenido inicial y contratos pendientes).
 - [Plan de administración y evolución del catálogo](./design/plan-administracion-catalogo-waby.md) (propuesta; define cómo Waby autoriza, prueba, publica y actualiza catálogos sin fijar aún el inventario inicial).
-- [Integraciones API externas](./design/integraciones-api-externas.md) (ownership aprobado; contratos técnicos pendientes).
+- [Integraciones API externas por AgentInstance](./design/integraciones-api-externas.md) (conexión, credenciales y operaciones configuradas por usuarios autorizados del Workspace; plan de agentes IA administrado por Organización; contratos técnicos pendientes).
 
 ## Documentación WAB-78
 
