@@ -78,17 +78,18 @@ Separar Skill de Capability:
 
 La propuesta es un catálogo Waby de Skills estándar con releases publicadas e inmutables. AgentDefinition referencia una identidad estable de Skill; AgentInstance conserva su selección/habilitación y configuración empresarial permitida, sin exponer al cliente la elección de release. Waby distribuye automáticamente releases compatibles mediante un canal gestionado y rollout controlado. La ejecución resuelve la release vigente y P10 captura el identificador/hash exacto utilizado. Así se preservan trazabilidad y reproducibilidad sin trasladar mantenimiento de versiones a la empresa.
 
-**Catálogo y configuraciones iniciales:** Waby mantiene un catálogo de configuraciones de agente por objetivo empresarial (por ejemplo, Atención, Ventas, Soporte y Legal). Cada AgentDefinition versionada referencia Skills estándar por identidad estable, marcadas como incluidas por defecto o recomendadas. El cliente no crea una AgentDefinition ni un catálogo técnico; selecciona una configuración inicial y personaliza su AgentInstance. El contenido funcional de estos catálogos se desarrolla en [Catálogo de agentes y Skills estándar](./catalogo-agentes-y-skills-estandar.md).
+**Catálogo y configuraciones iniciales:** Waby mantiene un catálogo de configuraciones de agente por objetivo empresarial (por ejemplo, Atención, Ventas, Soporte y Legal). Cada AgentDefinition referencia Skills estándar por identidad estable y puede recomendarlas como opciones. El usuario autorizado del Workspace decide cuáles habilita durante la configuración; una recomendación o una nueva Skill publicada no la activa automáticamente. El cliente no crea una AgentDefinition ni un catálogo técnico; selecciona una configuración inicial y personaliza su AgentInstance. El contenido funcional de estos catálogos se desarrolla en [Catálogo de agentes y Skills estándar](./catalogo-agentes-y-skills-estandar.md).
 
 **Punto por confirmar:** la dirección de producto previa indica que cada empresa debe tener procedimientos propios. Se propone admitir procedimientos empresariales asociados a la AgentInstance, separados de las Skills estándar publicadas por Waby. No deben convertirse en código ejecutable ni ampliar capabilities automáticamente. La representación exacta (Skill empresarial versionada o instrucciones/procedimientos de instancia) sigue pendiente de aprobación.
 
 ### 4.4 Defaults y cambios de AgentDefinition
 
 Propuesta:
-- `defaultSkills` y `defaultRules` definen la selección inicial de la plantilla, no una herencia dinámica de toda la AgentDefinition.
-- Al crear una AgentInstance, Waby copia la selección inicial y los parámetros de los defaults permitidos. Para las Skills estándar conserva una identidad estable y una política de actualización gestionada por Waby, no una versión que el cliente deba mantener.
-- Las nuevas releases compatibles de una Skill ya habilitada se distribuyen automáticamente mediante rollout controlado; no habilitan nuevas Skills ni amplían permisos.
-- Los cambios de la AgentDefinition que alteren la composición, añadan/quiten Skills o cambien capacidades no modifican silenciosamente las instancias existentes; se gestionan mediante una actualización de plantilla explícita y controlada.
+- `defaultSkills` y `defaultRules` definen la propuesta de configuración inicial de la plantilla, no una herencia dinámica de toda la AgentDefinition.
+- Durante la creación de una AgentInstance, la experiencia presenta las Skills recomendadas y permite al usuario autorizado decidir cuáles habilitar. La selección resultante pertenece a la instancia; no se altera por cambios posteriores del catálogo.
+- Para una Skill habilitada, Waby conserva una identidad estable y administra sus releases. Las mejoras compatibles se distribuyen automáticamente mediante rollout controlado y pueden comunicarse con un aviso informativo; el cliente no mantiene versiones.
+- Publicar una Skill nueva, agregarla a las recomendaciones de una AgentDefinition o ampliar el catálogo no la habilita en instancias existentes. El usuario debe decidir expresamente incorporarla.
+- Los cambios de una AgentDefinition que alteren composición, recomendaciones, Skills o capacidades no modifican silenciosamente la configuración de instancias existentes; se presentan como propuestas controladas. Las nuevas Skills requieren habilitación expresa.
 - Las políticas obligatorias de plataforma y las revocaciones de seguridad prevalecen sobre cualquier configuración previa. Waby puede bloquear una release vulnerable aunque una ejecución o instancia la tenga referenciada.
 - Las acciones de publicación, rollout, promoción, rollback y revocación son administradas y auditadas por Waby.
 
