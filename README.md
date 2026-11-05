@@ -51,3 +51,10 @@ Cada proyecto puede ampliar su estructura cuando exista contenido real que lo ju
 La documentación se redacta en español, salvo nombres técnicos, identificadores, rutas o términos cuyo uso en inglés sea más preciso. Se priorizan documentos claros, verificables y con referencias a evidencia.
 
 Consulta [DOCUMENTATION-GUIDELINES.md](DOCUMENTATION-GUIDELINES.md) para las convenciones de trabajo.
+
+## Agent instructions and backup
+
+- [`AGENTS.md`](./AGENTS.md): instructions for agents working directly in this documentation repository.
+- [`backups/elemesoft-root/AGENTS.md`](./backups/elemesoft-root/AGENTS.md): backup copy of the root `AGENTS.md` used in `F:\ElemenSoft`, including the Waby workflow section.
+
+The backup is preserved separately because the ElemeSoft workspace rules and the instructions for this standalone documentation repository have different scopes.
