@@ -1,6 +1,6 @@
 # Administración y evolución del catálogo de agentes y Skills de Waby
 
-**Estado:** plan de producto y operación propuesto; no define todavía el catálogo inicial ni el modelo persistente.  
+**Estado:** dirección general de actualización acordada; quedan pendientes los contratos detallados de compatibilidad, notificación, rollout y excepciones de seguridad. No define todavía el catálogo inicial ni el modelo persistente.  
 **Fecha:** 05/11/2026.  
 **Fase:** WAB-78 — dejar preparado el enfoque para una etapa posterior de diseño e implementación.  
 **Principio:** Waby administra y mejora el catálogo; los clientes utilizan agentes actualizados sin gestionar versiones técnicas.
@@ -36,28 +36,33 @@ No es necesario imponer Semantic Versioning ni mostrar números de versión al c
 
 ## 3. El cliente no administra versiones: política de actualización gestionada por Waby
 
-La propuesta es que las Skills estándar y mejoras compatibles del catálogo se mantengan en un **canal administrado por Waby** (por ejemplo, Stable), sin que la empresa tenga que elegir versiones.
+La política general acordada es que **Waby administra las releases y distribuye automáticamente las mejoras compatibles de las Skills que cada AgentInstance ya tiene habilitadas**. El cliente no elige versiones ni realiza actualizaciones técnicas manuales.
 
-### Actualizaciones compatibles
+Esta política no cambia la decisión empresarial sobre qué hace el agente: automatiza el mantenimiento de una Skill que el cliente ya eligió utilizar, no la incorporación de nuevas funciones al agente.
+
+### Mejoras normales de una Skill habilitada
 
 - Waby publica una nueva release después de validarla.
 - La release pasa por despliegue progresivo y observación.
-- Una vez promovida al canal estable, las instancias que tengan habilitada esa Skill reciben la actualización conforme a la política de rollout.
+- Una vez promovida, las instancias que ya tienen habilitada esa misma Skill reciben la mejora automáticamente conforme al rollout.
+- La actualización conserva la identidad, el propósito y el alcance funcional de la Skill que el cliente habilitó. No cambia su estado habilitado/deshabilitado, no amplía permisos, no habilita capabilities ni integraciones y no sustituye Rules o instrucciones empresariales.
+- Waby puede mostrar un aviso informativo de actualización, con una explicación comprensible de la mejora y su fecha. El aviso informa; no requiere que el cliente elija una versión ni apruebe una actualización compatible.
 - La personalización empresarial de la AgentInstance no se sobrescribe.
-- El cliente no debe tener que aceptar individualmente cada mejora compatible ni administrar versiones técnicas.
-- Waby informa cambios relevantes cuando puedan alterar de forma perceptible el comportamiento.
 
-### Cambios incompatibles o de comportamiento significativo
+Si un cambio altera sustancialmente el propósito o alcance de una Skill, no debe presentarse como una simple mejora de su release. Debe tratarse como una Skill nueva o como un cambio de configuración que requiere una decisión explícita del cliente.
 
-- Requieren evaluación de impacto, pruebas de compatibilidad y despliegue progresivo.
-- No deben sobrescribir las instrucciones propias, Rules ni preferencias de la empresa.
-- Antes de extenderlos a todas las instancias, Waby debe validar la coexistencia con las configuraciones empresariales.
-- La política de transición y comunicación se definirá para el catálogo real; no se impone ahora una elección de versión al cliente.
+### Skills nuevas y cambios de composición
+
+- Publicar una Skill nueva en el catálogo **no la habilita automáticamente en ningún agente existente**.
+- Añadir una Skill a las recomendaciones de una AgentDefinition tampoco modifica la selección de Skills de las AgentInstances ya creadas.
+- Waby puede informar que existe una Skill nueva y explicar para qué sirve, pero debe quedar como opción disponible/recomendada hasta que un usuario autorizado del Workspace decida habilitarla.
+- La configuración del agente debe conservar las elecciones de la empresa. Una Skill que el cliente no desea —por ejemplo, detectar señales de malestar del contacto— no debe ejecutarse ni producir efectos por el hecho de que Waby la haya añadido al catálogo.
+- Los cambios de composición de una AgentDefinition se presentan como recomendaciones o propuestas de actualización; no activan Skills ni cambian silenciosamente la configuración de instancias existentes.
 
 ### Actualizaciones de seguridad
 
 - La seguridad prevalece sobre la continuidad de una release anterior.
-- Waby puede retirar/bloquear una versión afectada y forzar la corrección o deshabilitar temporalmente la Skill/capacidad comprometida.
+- Waby puede retirar/bloquear una versión afectada y forzar una corrección o deshabilitar temporalmente la Skill/capacidad comprometida.
 - Una empresa no puede mantener habilitada una versión declarada vulnerable por preferencia o bloqueo de actualización.
 - Las revocaciones urgentes de capabilities/integraciones deben ser efectivas en el punto de autorización, incluso si una ejecución tiene un snapshot previo.
 - Una ejecución en curso conserva P10 para su configuración ordinaria, pero no puede iniciar una operación que haya sido revocada por seguridad. Una llamada externa ya completada no puede deshacerse retroactivamente; el diseño posterior debe especificar cómo cancelar o invalidar los pasos restantes.
@@ -66,8 +71,7 @@ La propuesta es que las Skills estándar y mejoras compatibles del catálogo se 
 
 - Waby puede detener el rollout y volver a una release anterior compatible y segura.
 - No se puede hacer rollback hacia una versión vulnerable, revocada o incompatible con políticas actuales.
-- Cada promoción, pausa, sustitución, bloqueo y rollback debe quedar auditado.
-
+- Cada promoción, pausa, sustitución, bloqueo, aviso y rollback debe quedar auditado.
 ## 4. Relación entre catálogo, AgentDefinition, AgentInstance y P10
 
 Separar tres conceptos:
