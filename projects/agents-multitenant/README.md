@@ -13,6 +13,10 @@ Documentación del proyecto de arquitectura y evolución del sistema de agentes 
 
 El conjunto de informes y material de revisión de la Fase 2 está centralizado en [Auditorías WAB-78](./audits/wab-78/README.md). El índice registra los ocho documentos migrados y sus fuentes originales de Dropbox.
 
+## Principios de experiencia del agente
+
+La configuración de agentes debe ser sencilla, guiada y accesible para usuarios sin conocimientos técnicos. Un agente debe poder crearse y utilizarse con instrucciones y Knowledge propios, sin ERP ni integraciones externas. Las capacidades avanzadas, incluidas las integraciones, son opcionales y progresivas. Ver [Experiencia de configuración de agentes](./design/experiencia-configuracion-agentes.md) y [Integraciones API externas](./design/integraciones-api-externas.md).
+
 ## Seguimiento
 
 Linear es la fuente de verdad para el estado de las fases, decisiones aprobadas, dependencias y tareas. La documentación enlaza las issues relevantes, sin duplicar su seguimiento.
