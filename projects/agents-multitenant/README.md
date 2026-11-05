@@ -9,18 +9,15 @@ Documentación del proyecto de arquitectura y evolución del sistema de agentes 
 - Contratos de dominio, runtime, contexto, aislamiento y persistencia.
 - Planes de implementación y criterios de aceptación.
 
-## Organización
+## Documentación WAB-78
 
-- `audits/`: informes de diagnóstico; evidencia histórica.
-- `architecture/`: arquitectura objetivo y vistas del sistema.
-- `contracts/`: contratos funcionales y técnicos.
-- `plans/`: fases, secuencias y planes de implementación.
+El conjunto de informes y material de revisión de la Fase 2 está centralizado en [Auditorías WAB-78](./audits/wab-78/README.md). El índice registra los ocho documentos migrados y sus fuentes originales de Dropbox.
 
 ## Seguimiento
 
-Linear es la fuente de verdad para el estado de las fases, decisiones aprobadas, dependencias y tareas. La documentación debe enlazar las issues relevantes, no duplicar su seguimiento.
+Linear es la fuente de verdad para el estado de las fases, decisiones aprobadas, dependencias y tareas. La documentación enlaza las issues relevantes, sin duplicar su seguimiento.
 
-Referencia principal de diseño: [WAB-78 — Fase 2: Diseño objetivo y contratos](https://linear.app/waby/issue/WAB-78/fase-2-diseno-objetivo-y-contratos).
+Referencia principal: [WAB-78 — Fase 2: Diseño objetivo y contratos](https://linear.app/waby/issue/WAB-78/fase-2-diseno-objetivo-y-contratos).
 
 ## Criterios de trabajo
 
