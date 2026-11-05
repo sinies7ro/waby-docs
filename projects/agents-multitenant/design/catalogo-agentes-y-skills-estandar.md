@@ -63,12 +63,15 @@ Una misma Skill puede ser referenciada por varias configuraciones de agente. No 
 
 ### Versionado y personalización
 
-- Las Skills estándar son administradas por Waby y sus versiones publicadas son inmutables.
-- AgentDefinition referencia versiones concretas de Skills.
-- Al crear una AgentInstance, sus Skills iniciales se incorporan mediante referencias explícitas a versiones; no hay herencia dinámica silenciosa.
-- La empresa puede habilitar/configurar las Skills que Waby permita personalizar para su instancia.
-- La empresa también puede agregar procedimientos o instrucciones propios. Estos se distinguen de las Skills estándar, se versionan con la configuración de la instancia y no se convierten en código ejecutable ni conceden permisos por sí mismos.
-- Una actualización del catálogo no cambia automáticamente una AgentInstance existente. Waby puede ofrecer una actualización guiada, con explicación de cambios y aplicación controlada.
+- Las Skills estándar son administradas por Waby. Cada release publicada es inmutable y se conserva para trazabilidad, pruebas, auditoría y rollback seguro.
+- AgentDefinition referencia Skills por identidad estable y declara si se incluyen por defecto o se recomiendan; no obliga al cliente a administrar números de versión.
+- AgentInstance conserva qué Skills tiene habilitadas y su configuración empresarial permitida. Waby resuelve la release vigente según el canal de actualización gestionado.
+- Las actualizaciones compatibles se distribuyen automáticamente mediante rollout controlado, sin exigir intervención técnica del cliente y sin sobrescribir sus personalizaciones.
+- P10 registra en cada ejecución la release exacta de Skill utilizada. Las ejecuciones anteriores conservan su snapshot; las siguientes pueden utilizar la release estable promovida por Waby.
+- Las actualizaciones de seguridad pueden bloquear/revocar releases vulnerables y prevalecen sobre la continuidad de versiones anteriores.
+- La empresa puede agregar procedimientos o instrucciones propios. Se distinguen de las Skills estándar, se revisan/versionan internamente como parte de la configuración de instancia y no se convierten en código ejecutable ni conceden permisos por sí mismos.
+
+La política operativa completa (autoría, pruebas, aprobación, rollout, rollback, retirada y seguridad) está en [Plan de administración y evolución del catálogo](./plan-administracion-catalogo-waby.md).
 
 ## 4. Ejemplo: agente de Atención que detecta malestar y deriva a una persona
 
