@@ -158,7 +158,7 @@ La interfaz no debe exponer los nombres técnicos de capas, hashes, versiones, p
 ## 8. Decisiones que esta propuesta necesita confirmar
 
 1. **Precedencia del prompt:** aceptar que las instrucciones propias de la empresa se agregan al bloque base y no reemplazan el núcleo/políticas de Waby.
-2. **Defaults de definición:** aceptar que Skills/Rules defaults se copian como referencias versionadas al crear la instancia y no se heredan dinámicamente.
+2. **Selección inicial de Skills:** aceptar que AgentDefinition puede recomendar Skills, pero la selección que queda habilitada en AgentInstance la decide expresamente el usuario autorizado del Workspace. No se activan Skills por el solo hecho de figurar como default/recomendación ni se incorporan automáticamente a instancias existentes por cambios posteriores del catálogo.
 3. **Skills empresariales:** confirmar que las empresas pueden definir procedimientos propios para cada instancia, separados de las Skills estándar que Waby mantiene; dichos procedimientos no conceden por sí solos permisos/capabilities.
 4. **Autoridad humana:** confirmar que un usuario autorizado del Workspace puede crear y configurar su AgentInstance desde una definición publicada, mientras Waby conserva las operaciones exclusivas de plataforma y el provisioning técnico. El permiso exacto no se decide aquí.
 
