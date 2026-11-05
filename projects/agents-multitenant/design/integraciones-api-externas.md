@@ -1,14 +1,16 @@
 # Integraciones API externas — diseño de WAB-78
 
-**Estado:** decisión de ownership aprobada; contratos detallados en propuesta, pendientes de validación dentro de WAB-78.  
+**Estado:** ownership de Integración a nivel Organización y habilitación por AgentInstance a nivel Workspace aprobados; actor de administración de conexiones/credenciales/catálogo de ámbito Organización y contratos técnicos siguen pendientes de definición en WAB-78.  
 **Fecha:** 05/11/2026.  
 **Alcance:** capacidad para que una AgentInstance consulte o ejecute operaciones explícitamente configuradas contra APIs de sistemas de la Organización cliente. No define todavía el modelo persistente final ni autoriza implementación.
 
 ## 1. Decisión aprobada
 
 - Una **Integración pertenece a una Organización**.
-- La Organización registra y administra la conexión con el sistema externo y el catálogo de operaciones disponibles.
-- Cada **Workspace decide qué operaciones habilita para cada una de sus AgentInstances**.
+- La Integración, la conexión con el sistema externo, las credenciales y el catálogo de operaciones pertenecen al ámbito de la Organización.
+- El plan de la Organización determina si la funcionalidad de agentes IA está comercialmente habilitada; su administrador gestiona el plan, no la configuración particular de las AgentInstances.
+- Cada **Workspace decide qué operaciones habilita para cada una de sus AgentInstances**, mediante un usuario autorizado del Workspace.
+- El administrador de la Organización no habilita Skills ni operaciones de integración para una AgentInstance concreta.
 - Una AgentInstance solo puede utilizar las operaciones que estén autorizadas para ella en su Workspace.
 - Una autorización de un Workspace nunca amplía el catálogo definido por la Organización ni permite acceder a integraciones de otra Organización.
 
@@ -29,8 +31,8 @@ Los nombres son conceptuales; no representan todavía nombres de colecciones, cl
 
 ### Ownership y configuración
 
-- La Organización administra conexiones, credenciales, definición y ciclo de vida de las operaciones.
-- El Workspace administra las autorizaciones para sus AgentInstances, sin poder editar credenciales ni ampliar el catálogo de operaciones.
+- La conexión, las credenciales y el catálogo de operaciones son recursos de ámbito Organización. Su actor administrador concreto queda pendiente; no debe asumirse que el administrador de Organización, cuya responsabilidad de producto es gestionar el plan/entitlement, configura las AgentInstances.
+- El Workspace administra las autorizaciones para sus AgentInstances mediante usuarios autorizados, sin poder editar credenciales ni ampliar el catálogo de operaciones.
 - La relación de autorización debe comprobar que Integración, Workspace y AgentInstance pertenecen a la misma Organización y que la AgentInstance pertenece al Workspace indicado.
 - Si una empresa necesita conectar distintos entornos o credenciales (por ejemplo, ERP de dos unidades), puede registrar integraciones separadas bajo la misma Organización. No se propone que un Workspace sobrescriba silenciosamente las credenciales de una integración compartida.
 
@@ -104,7 +106,7 @@ Cada invocación debe permitir reconstruir quién pidió qué operación, bajo q
 
 ## 9. Puntos aún pendientes de contrato en WAB-78
 
-1. Roles/permisos exactos para crear integraciones, administrar credenciales, registrar operaciones y habilitarlas por AgentInstance. Deben derivarse de la matriz real de permisos; no inventar permisos nuevos en esta propuesta.
+1. Roles/permisos exactos para administrar conexiones, credenciales y el catálogo de operaciones de ámbito Organización (actor aún no definido), así como permisos de usuario autorizado del Workspace para habilitar/revocar operaciones por AgentInstance. Esta última responsabilidad sí está asignada al Workspace. Deben derivarse de la matriz real de permisos; no inventar permisos nuevos en esta propuesta.
 2. Cómo se define el catálogo: formulario manual, importación OpenAPI o ambos, y qué validaciones realiza Waby antes de publicar una operación.
 3. Métodos de autenticación y alcance de la primera versión (API key, Bearer estático, OAuth u otros).
 4. Tratamiento de operaciones de escritura/sensibles: cuándo se exige confirmación humana o del usuario final y cómo evitar duplicaciones ante reintentos.
