@@ -125,4 +125,4 @@ El siguiente trabajo es incorporar este registro al documento integral de Fase 2
 - [WAB-78 — Fase 2 en Linear](https://linear.app/waby/issue/WAB-78/fase-2-diseno-objetivo-y-contratos)
 - [WAB-77 — Auditoría en Linear](https://linear.app/waby/issue/WAB-77/fase-1-auditoria-del-sistema-actual-sin-modificar-codigo)
 
-**Nota de integridad documental:** el documento integral original de Fase 2 y el informe completo WAB-77 fueron recibidos como adjuntos de una sesión anterior, no están todavía versionados en este repositorio. Este registro no suplanta esos archivos ni afirma que su migración íntegra ya se haya realizado.
+**Nota de integridad documental:** el documento integral de Fase 2 y el informe completo WAB-77 ya están versionados en sus rutas canónicas de este repositorio (ver secciones de diseño y auditorías de este índice). Este registro no suplanta esos archivos ni afirma que su migración íntegra ya se haya realizado; mantiene únicamente el registro de precedencia y las decisiones aprobadas.
