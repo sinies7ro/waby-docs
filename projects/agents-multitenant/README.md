@@ -18,6 +18,8 @@ Documentación del proyecto de arquitectura y evolución del sistema de agentes 
 - [Plan de administración y evolución del catálogo](./design/plan-administracion-catalogo-waby.md) (propuesta; define cómo Waby autoriza, prueba, publica y actualiza catálogos sin fijar aún el inventario inicial).
 - [Integraciones API externas por AgentInstance](./design/integraciones-api-externas.md) (conexión, credenciales y operaciones configuradas por usuarios autorizados del Workspace; plan de agentes IA administrado por Organización; contratos técnicos pendientes).
 
+- [Mapa documental y estado de sincronización WAB-75/WAB-78](./estado-y-mapa-documental-wab-75-wab-78.md) (responsabilidad de repositorios, clasificación de documentos recibidos, contradicciones y secuencia de reconciliación).
+
 ## Documentación WAB-78
 
 El conjunto de informes y material de revisión de la Fase 2 está centralizado en [Auditorías WAB-78](./audits/wab-78/README.md). El índice distingue los ocho documentos migrados originalmente desde Dropbox de los informes y reconciliaciones D5 incorporados posteriormente.
