@@ -1,6 +1,6 @@
 # Configuración efectiva y capacidades de AgentInstance — propuesta CTX-P3 / CTX-P4
 
-**Estado:** CTX-P3 y CTX-P4 aprobados como dirección y contrato conceptual por el usuario el 05/11/2026. Los detalles de autorización, identidad de servicio y persistencia siguen pendientes de definición en sus fases correspondientes.  
+**Estado:** CTX-P3/CTX-P4 aprobados como dirección y contrato conceptual. ARQ-19 (modelo híbrido por operación) y ARQ-20 (contrato `wrk.agents.*` / `wrk.agents.read`) están resueltos documentalmente. ARQ-21 tiene aprobada la Opción C y el contrato base de JWT de servicio RS256; el inventario exhaustivo de operaciones, scopes, rotación, verificación integral de flujos y evidencia de despliegue siguen pendientes.  
 **Fecha:** 05/11/2026.  
 **Fase:** WAB-78 — diseño objetivo y contratos.  
 **No autoriza:** cambios de código, schemas, permisos, datos ni inicio de WAB-79/WAB-80.
@@ -170,7 +170,44 @@ La interfaz no debe exponer los nombres técnicos de capas, hashes, versiones, p
 7. **Límites de la AgentInstance:** nunca administra usuarios, invita miembros, modifica membresías, roles, permisos ni estructura de la Organización/Workspace.
 8. **Identidad y ámbito:** toda ejecución actúa dentro de una Organización, un Workspace y una AgentInstance concretos. Waby valida la cadena de ownership y las autorizaciones en backend/runtime; no se confía en IDs aportados por el LLM ni en un token interno sin contexto de tenant.
 
-**Pendientes técnicos relacionados:** resolver ARQ-03, ARQ-19, ARQ-20 y ARQ-21 con una matriz operación × actor × alcance y un mecanismo de identidad de servicio válido. La definición de permisos concretos, provisioning y controles de servicio se implementará/detallará en WAB-80. Permanecen por definir el flujo UX/técnico para configurar credenciales, los mecanismos de autenticación admitidos, cómo se definen/importan operaciones, las validaciones de destino/esquema y si en el futuro se permitirá compartir explícitamente una conexión entre varias AgentInstances del mismo Workspace. La configuración inicial se considera privada de cada AgentInstance.
+**Pendientes técnicos de integraciones:** flujo UX/técnico para configurar credenciales; cómo se definen/importan operaciones; validaciones de destino/esquema; y si en el futuro se permitirá compartir explícitamente una conexión entre varias AgentInstances del mismo Workspace. La configuración inicial se considera privada de cada AgentInstance. ARQ-19 y ARQ-20 ya no son pendientes documentales. ARQ-21 conserva los pendientes de especificación e implementación enumerados en §8.1.
+
+## 8.1 Resolución y estado de ARQ-19, ARQ-20 y ARQ-21
+
+### ARQ-19 — Autoridad híbrida por operación
+
+La decisión está resuelta. Waby administra AgentDefinitions, catálogos centrales, proveedores/modelos/credenciales LLM, políticas obligatorias, provisioning técnico y purga física bajo política. Los usuarios humanos autorizados del Workspace administran integralmente las AgentInstances de su Workspace: creación desde definiciones publicadas, consulta, configuración empresarial, Knowledge/Skills/Rules permitidas, integraciones y credenciales asociadas a la instancia, activación, suspensión/reactivación, designación predeterminada y eliminación lógica.
+
+El administrador de Organización conserva la administración del plan/entitlement comercial, pero ese rol no concede por sí solo control de AgentInstances. La administración de instancia no permite modificar AgentDefinitions, políticas ni recursos centrales de Waby. La ejecución de Capabilities mantiene autorización contextual independiente.
+
+### ARQ-20 — Permisos de Workspace
+
+El contrato documental está aprobado y cerrado:
+
+- `wrk.agents.*`: concesión integral para administrar AgentInstances.
+- `wrk.agents.read`: consulta/visualización sin facultades administrativas.
+- Workspace Owner: `wrk.agents.*` por herencia de `wrk.*.*`.
+- Workspace Manager: `wrk.agents.*` explícito.
+- Workspace Agent: `wrk.agents.read`.
+
+Ambos identificadores deben declararse explícitamente en `permission.enum.ts`; la interpretación genérica de comodines no sustituye su declaración formal. No se crea `wrk.agents.manage`, `wrk.agent.use` ni permisos administrativos separados por operación. Estos permisos no sustituyen membership/ownership ni la autorización contextual de cada Capability. La implementación y las pruebas corresponden a WAB-80.
+
+### ARQ-21 — Identidad y autenticación entre servicios
+
+La decisión aprobada es la **Opción C: JWT de servicio firmados, de corta duración y con credenciales diferenciadas por dirección**:
+
+- CRM → ai-service: identidad de servicio CRM, token destinado a ai-service.
+- ai-service → CRM: identidad de servicio ai-service, token destinado a CRM.
+- Algoritmo de firma seleccionado: **RS256** (firma asimétrica). Cada dirección utiliza credenciales de firma diferenciadas; el receptor valida con la clave pública correspondiente.
+- Se emite un JWT por petición y con el scope mínimo necesario para esa operación.
+- Claims acordados: `iss`, `sub`, `aud`, `iat`, `nbf`, `exp`, `jti`, `scope`, `orgId`, `workspaceId`, `agentInstanceId` y `initiatedBy`.
+- `initiatedBy` conserva la identidad del usuario iniciador para auditoría; **no** autentica al servicio ni concede autorización.
+- El receptor valida algoritmo/firma, emisor, sujeto de servicio esperado, audiencia, vigencia, scope y contexto tenant/recurso. Después verifica el ownership y el estado vigentes en CRM. Los claims no sustituyen la autorización de dominio.
+- Cuando una operación no corresponde a una AgentInstance, el contexto de instancia se aplica según el alcance real de esa operación; no se debe inventar un recurso.
+
+**Pendiente para completar ARQ-21:** inventario exhaustivo de operaciones internas en ambas direcciones; scope mínimo por operación; claims obligatorios/opcionales por flujo; provisión, rotación y revocación de claves; semántica de unicidad/replay de `jti`; confianza/autenticación de mensajes RabbitMQ; pruebas negativas y verificación de despliegue. La decisión de arquitectura está seleccionada, pero la implementación y el comportamiento real en producción no se consideran verificados.
+
+El detalle de DEC-CM-01 a DEC-CM-08 —versionado efectivo, `additionalPrompt`, parámetros técnicos, selección de instancia, cambio de definición, asignación, suspensión y predeterminada— está en [Decisiones operativas de AgentInstance](./decisiones-operativas-agent-instance.md) y en el registro operativo de WAB-78.
 
 ## 9. Fuera de alcance / no reabrir
 
