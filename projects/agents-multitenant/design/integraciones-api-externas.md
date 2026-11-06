@@ -107,7 +107,7 @@ Cada invocación debe permitir reconstruir quién pidió qué operación, bajo q
 
 ## 9. Puntos aún pendientes de contrato en WAB-78
 
-1. Permisos exactos para que usuarios autorizados del Workspace creen, configuren, prueben, actualicen y revoquen conexiones, credenciales y operaciones por AgentInstance. Deben derivarse de la matriz real de permisos; no inventar permisos nuevos en esta propuesta.
+1. **Autorización administrativa de la configuración:** el permiso de administración de AgentInstance quedó definido en ARQ-20: `wrk.agents.*` (Owner por herencia de `wrk.*.*`; Manager explícito), con `wrk.agents.read` para consulta. Incluye administrar conexiones, credenciales y operaciones asociadas a la instancia. La autorización backend de cada invocación/Capability y de cada efecto externo sigue siendo contextual e independiente; `wrk.agents.*` no la sustituye. La incorporación al enum, guards, ownership y pruebas corresponden a WAB-80.
 2. Cómo se definen las operaciones de cada AgentInstance: selección de operaciones/plantillas soportadas por Waby, configuración manual, importación OpenAPI o combinación; qué validaciones realiza Waby antes de habilitarlas.
 3. Métodos de autenticación y alcance de la primera versión (API key, Bearer estático, OAuth u otros).
 4. Tratamiento de operaciones de escritura/sensibles: cuándo se exige confirmación humana o del usuario final y cómo evitar duplicaciones ante reintentos.
