@@ -76,7 +76,7 @@ Las integraciones son extensiones opcionales del agente, no una condición para 
 - Permitir probar la conexión y la operación antes de habilitarla para una AgentInstance.
 - Mantener los controles técnicos, de seguridad y aislamiento en Waby, aunque la interfaz sea sencilla.
 
-La Organización sigue siendo propietaria de las integraciones; cada Workspace decide qué operaciones habilita para sus AgentInstances, conforme al documento [Integraciones API externas](./integraciones-api-externas.md).
+La Organización es el ámbito superior de tenancy y administra el plan comercial de agentes IA. La conexión externa, sus credenciales y las operaciones configuradas se asocian a cada AgentInstance dentro de su Workspace y son administradas por usuarios autorizados del Workspace, conforme al documento [Integraciones API externas](./integraciones-api-externas.md).
 
 ## 5. Separación entre simplicidad de UX y rigor interno
 
