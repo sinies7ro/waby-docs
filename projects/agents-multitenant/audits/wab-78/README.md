@@ -32,6 +32,15 @@ Los originales de Dropbox no se modificaron ni eliminaron. Los enlaces de origen
 - `matriz-acumulativa.md`: matriz acumulativa de hallazgos ARQ.
 - `analisis-previo-d2-d4.md`: material previo preservado para D2–D4.
 
+## Documentos incorporados después de la migración original
+
+Los siguientes documentos se incorporaron posteriormente al conjunto de trabajo de WAB-78. **No forman parte de los ocho archivos recuperados de Dropbox** ni alteran el inventario histórico de la migración:
+
+- [informe-bloque-5b.md](./informe-bloque-5b.md): diagnóstico D5-B y propuesta de contrato.
+- [reconciliacion-d5-a-d5-b.md](./reconciliacion-d5-a-d5-b.md): reconciliación D5-A/D5-B, clasificación de contratos y asuntos reservados a D5-C.
+
+La matriz acumulativa se mantiene como registro consolidado de hallazgos ARQ; estos informes conservan su función de evidencia y análisis, no de seguimiento operativo de tareas.
+
 ## Integridad y método
 
 Cada archivo se recuperó desde Dropbox mediante su identificador de archivo y se creó en GitHub con el texto Markdown completo devuelto por Dropbox. La verificación posterior compara el contenido leído desde GitHub con el contenido recuperado desde Dropbox, archivo por archivo.
