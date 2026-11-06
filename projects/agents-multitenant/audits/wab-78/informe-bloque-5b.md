@@ -1,5 +1,7 @@
 # INFORME D5-B — Auditoría de conocimiento externo y confidencialidad de Waby
 
+> **Vigencia documental:** auditoría histórica D5-B del 05/11/2026. Sus hallazgos y evidencia se preservan; sus recomendaciones son propuestas de auditoría, no decisiones aprobadas ni contrato vigente. Para decisiones posteriores y contratos aprobados prevalecen Linear WAB-78 y el [diseño canónico de Fase 2](../../design/fase-2-diseno-objetivo-y-contratos.md), junto con los registros D5-A/D5-C en Linear.
+
 **Proyecto afectado:** `crm/` (microservicio `ai-service` en `crm/microservices/ai-service/`)
 **Fase:** WAB-78 — Fase 2: Diseño objetivo y contratos de arquitectura de agentes administrados por Waby
 **Modalidad:** Auditoría de solo lectura. Sin modificación de código, schemas, configuración ni tests.
