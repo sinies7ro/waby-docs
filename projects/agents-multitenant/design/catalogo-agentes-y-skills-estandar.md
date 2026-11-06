@@ -165,4 +165,4 @@ Las opciones avanzadas y las integraciones se ofrecen cuando tienen sentido, nun
 - Las integraciones son opcionales: el agente funciona con instrucciones y Knowledge.
 - P10 sigue vigente: cada ejecución conserva un snapshot efectivo inmutable.
 - Las reglas aprobadas de routing/delegación de P2 gobiernan la transferencia a humanos/equipos.
-- Esta definición no cierra CTX-P3/CTX-P4 ni autoriza iniciar WAB-79.
+- CTX-P3/CTX-P4 están aprobados como dirección y contrato conceptual; este documento desarrolla el catálogo sin modificar ese contrato. Esta definición no cierra WAB-78 ni autoriza iniciar WAB-79.
