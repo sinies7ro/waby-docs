@@ -161,8 +161,8 @@ Las opciones avanzadas y las integraciones se ofrecen cuando tienen sentido, nun
 - La propiedad de AgentDefinition y las políticas centrales sigue siendo de Waby.
 - AgentInstance sigue perteneciendo al Workspace.
 - Skills estándar son administradas/versionadas por Waby; procedimientos empresariales pertenecen al alcance de la instancia y no otorgan capacidades.
-- Las integraciones siguen perteneciendo a la Organización y cada Workspace habilita operaciones por AgentInstance.
+- Las conexiones externas, sus referencias seguras a credenciales y las operaciones habilitadas se asocian a cada AgentInstance y quedan dentro de su Workspace. Usuarios autorizados del Workspace las configuran; Waby administra conectores/ejecutores y la Organización conserva el ámbito superior de tenancy y el plan comercial.
 - Las integraciones son opcionales: el agente funciona con instrucciones y Knowledge.
 - P10 sigue vigente: cada ejecución conserva un snapshot efectivo inmutable.
 - Las reglas aprobadas de routing/delegación de P2 gobiernan la transferencia a humanos/equipos.
-- Esta definición no cierra CTX-P3/CTX-P4 ni autoriza iniciar WAB-79.
+- CTX-P3/CTX-P4 están aprobados como dirección y contrato conceptual; este documento desarrolla el catálogo sin modificar ese contrato. Esta definición no cierra WAB-78 ni autoriza iniciar WAB-79.

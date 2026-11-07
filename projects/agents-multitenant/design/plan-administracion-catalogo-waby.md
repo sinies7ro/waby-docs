@@ -178,6 +178,6 @@ Estos puntos se definirán cuando estén cerrados el diseño de experiencia, el 
 - Skills son procedimientos/instrucciones; no son capabilities ejecutables ni permisos.
 - AgentDefinition y catálogo estándar son administrados por Waby.
 - AgentInstance pertenece al Workspace y conserva la personalización empresarial.
-- Las integraciones son opcionales y pertenecen a la Organización; cada Workspace habilita operaciones por AgentInstance.
+- Las integraciones son opcionales. La conexión externa, sus credenciales y operaciones se asocian a cada AgentInstance dentro de su Workspace y son configuradas por usuarios autorizados del Workspace; Waby administra los conectores/ejecutores y la Organización conserva el ámbito superior de tenancy y el plan comercial.
 - Las políticas de seguridad y revocaciones urgentes prevalecen sobre releases antiguas.
 - No se cierra WAB-78 ni se inicia WAB-79 con este plan.

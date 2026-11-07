@@ -7,33 +7,36 @@ Documentación del proyecto de arquitectura y evolución del sistema de agentes 
 - Auditorías y diagnósticos del sistema actual.
 - Arquitectura objetivo y decisiones de diseño.
 - Contratos de dominio, runtime, contexto, aislamiento y persistencia.
-- Planes de implementación y criterios de aceptación.
+- Planes técnicos y criterios de aceptación.
 
 ## Diseño objetivo
 
-- [Configuración efectiva y capacidades de AgentInstance — CTX-P3 / CTX-P4](./design/configuracion-efectiva-y-capacidades.md) (dirección y contratos conceptuales aprobados; ARQ-19/20/21 y detalles técnicos pendientes).
-- [Experiencia de configuración de agentes — principios de producto](./design/experiencia-configuracion-agentes.md) (principios aprobados; diseño visual pendiente).
-- [Catálogo de agentes y Skills estándar](./design/catalogo-agentes-y-skills-estandar.md) (dirección de producto aprobada; contenido inicial y contratos pendientes).
-- [Plan de administración y evolución del catálogo](./design/plan-administracion-catalogo-waby.md) (propuesta; define cómo Waby autoriza, prueba, publica y actualiza catálogos sin fijar aún el inventario inicial).
-- [Integraciones API externas por AgentInstance](./design/integraciones-api-externas.md) (conexión, credenciales y operaciones configuradas por usuarios autorizados del Workspace; plan de agentes IA administrado por Organización; contratos técnicos pendientes).
+- [Diseño integral y contratos de Fase 2 — WAB-78](./design/fase-2-diseno-objetivo-y-contratos.md) (**documento canónico de diseño**; integra ARQ-19/20/21, DEC-CM-01..08 y P4).
+- [Configuración efectiva y capacidades de AgentInstance — CTX-P3 / CTX-P4](./design/configuracion-efectiva-y-capacidades.md) (contrato conceptual de precedencia, configuración y capabilities).
+- [Decisiones operativas de AgentInstance — DEC-CM-01 a DEC-CM-08](./design/decisiones-operativas-agent-instance.md) (registro de decisiones conceptuales aprobadas el 06/11/2026).
+- [Reconciliación de vigencia de Fase 2 — WAB-78](./design/reconciliacion-vigencia-fase-2-wab-78.md) (precedencia documental y registro de contradicciones corregidas).
+- [Experiencia de configuración de agentes — principios de producto](./design/experiencia-configuracion-agentes.md).
+- [Catálogo de agentes y Skills estándar](./design/catalogo-agentes-y-skills-estandar.md).
+- [Plan de administración y evolución del catálogo](./design/plan-administracion-catalogo-waby.md).
+- [Integraciones API externas por AgentInstance](./design/integraciones-api-externas.md).
 
-## Documentación WAB-78
+## Auditorías y evidencia
 
-El conjunto de informes y material de revisión de la Fase 2 está centralizado en [Auditorías WAB-78](./audits/wab-78/README.md). El índice registra los ocho documentos migrados y sus fuentes originales de Dropbox.
-
-## Principios de experiencia del agente
-
-La configuración de agentes debe ser sencilla, guiada y accesible para usuarios sin conocimientos técnicos. Un agente debe poder crearse y utilizarse con instrucciones y Knowledge propios, sin ERP ni integraciones externas. Las capacidades avanzadas, incluidas las integraciones, son opcionales y progresivas. Ver [Experiencia de configuración de agentes](./design/experiencia-configuracion-agentes.md) y [Integraciones API externas](./design/integraciones-api-externas.md).
+- [WAB-77 — Auditoría consolidada de Fase 1](./audits/wab-77/README.md) (evidencia histórica, WAB-77 Done).
+- [WAB-78 — Índice documental y material de revisión](./audits/wab-78/README.md) (D1-D5, matriz acumulativa y material técnico de soporte).
 
 ## Seguimiento
 
-Linear es la fuente de verdad para el estado de las fases, decisiones aprobadas, dependencias y tareas. La documentación enlaza las issues relevantes, sin duplicar su seguimiento.
+Linear es la fuente de verdad para estados, decisiones aprobadas, dependencias, responsables y bloqueos. La documentación desarrolla el diseño transversal sin duplicar el seguimiento operativo.
 
-Referencia principal: [WAB-78 — Fase 2: Diseño objetivo y contratos](https://linear.app/waby/issue/WAB-78/fase-2-diseno-objetivo-y-contratos).
+- [WAB-77 — Fase 1](https://linear.app/waby/issue/WAB-77/fase-1-auditoria-del-sistema-actual-sin-modificar-codigo)
+- [WAB-78 — Fase 2](https://linear.app/waby/issue/WAB-78/fase-2-diseno-objetivo-y-contratos)
+
+WAB-78 permanece In Progress y bloquea WAB-79. Esta sincronización no cierra WAB-78 ni inicia WAB-79.
 
 ## Criterios de trabajo
 
-- No reabrir auditorías aceptadas sin evidencia nueva que lo justifique.
-- Separar hallazgos de auditoría, decisiones de diseño y trabajo pendiente de implementación.
-- Mantener trazabilidad desde cada contrato relevante hacia sus decisiones y criterios de aceptación.
-- No iniciar fases bloqueadas ni cambiar estados o dependencias de Linear sin autorización.
+- No reabrir auditorías aceptadas sin evidencia nueva.
+- Separar hallazgos históricos, decisiones aprobadas y trabajo pendiente de implementación.
+- Mantener trazabilidad desde cada contrato hacia las decisiones de Linear.
+- No modificar repositorios de implementación durante tareas documentales.
