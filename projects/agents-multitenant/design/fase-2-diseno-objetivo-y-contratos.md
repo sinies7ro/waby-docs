@@ -34,7 +34,7 @@ La auditoría de Fase 1 confirmó que `Bot` mezcla definición + instancia. No h
 - `KnowledgeBase` → se conserva como `WorkspaceKnowledge` (compartido por workspace, I11)
 - `Prompt` / `PromptVersion` → se reutilizan como base de `AgentDefinition` (versión de definición)
 - `MemoryFact` → se reemplaza por `ConversationMemory` (ventana 20, I14)
-- `BotCredential` → se elimina; credenciales centralizadas en Waby (I6)
+- `BotCredential` → se elimina; credenciales de proveedores LLM centralizadas en Waby (I6)
 
 **Entidades nuevas requeridas:**
 - `AgentDefinition` (propiedad Waby)
@@ -63,8 +63,8 @@ Propiedad de la plataforma Waby. Representa la definición lógica de un agente:
 | topP | Decimal | No | Top-p (default 1) |
 | frequencyPenalty | Decimal | No | Penalidad de frecuencia (default 0) |
 | presencePenalty | Decimal | No | Penalidad de presencia (default 0) |
-| defaultSkills | JSON[] | No | Skills por defecto asociadas a la definición |
-| defaultRules | JSON[] | No | Rules por defecto asociadas a la definición |
+| defaultSkills | JSON[] | No | Plantilla inicial de Skills que se copia a la nueva AgentInstance al crearla; no se hereda dinámicamente |
+| defaultRules | JSON[] | No | Plantilla inicial de Rules que se copia a la nueva AgentInstance al crearla; no se hereda dinámicamente |
 | version | Integer | Sí | Versión de la definición |
 | status | Enum | Sí | `draft` / `active` / `retired` |
 | createdBy | String | Sí | Usuario de Waby que creó la definición |
@@ -73,6 +73,8 @@ Propiedad de la plataforma Waby. Representa la definición lógica de un agente:
 | retiredAt | Timestamp | No | Fecha de retiro |
 
 **Cardinalidad:** Una AgentDefinition puede tener cero o más AgentInstance asociadas (1:N, sin unicidad workspaceId+agentDefinitionId per I16).
+
+**Inicialización de AgentInstance:** al crear una instancia, `defaultSkills` y `defaultRules` de la versión de AgentDefinition utilizada se copian como configuración inicial en sus `SkillConfiguration` y `AgentRules`. Son plantillas de inicialización, no herencia dinámica: los cambios posteriores en los valores por defecto de AgentDefinition no modifican instancias existentes. Cada Workspace administra luego la configuración permitida de su instancia, sujeta a las políticas Waby.
 
 #### AgentInstance (Workspace)
 Propiedad de un Workspace. Representa una instancia ejecutable de una AgentDefinition asignada a un Workspace específico.
@@ -164,7 +166,7 @@ Skills pertenecientes individualmente a cada AgentInstance (I12). Sin herencia n
 | skillName | String | Sí | Nombre de la skill |
 | enabled | Boolean | Sí | Si la skill está habilitada para esta instancia |
 | config | JSON | No | Configuración específica de la skill para esta instancia |
-| credentials | JSON | No | Credenciales propias de la skill (si aplica, gestionadas por Waby) |
+| credentials | JSON | No | Referencias (IDs) a credenciales de integraciones empresariales configuradas y administradas por el Workspace; no almacena secretos ni credenciales LLM. Los secretos se gestionan mediante el mecanismo seguro de credenciales de la plataforma. |
 | createdAt | Timestamp | Sí | Fecha de creación |
 | updatedAt | Timestamp | Sí | Fecha de última actualización |
 
@@ -205,7 +207,7 @@ Memoria operativa por conversación, asociada a AgentInstance. Solo mensajes `us
 **Cardinalidad:** Una ConversationMemory pertenece a una AgentInstance y una conversación (N:1:N). Una conversación tiene exactamente una ConversationMemory por AgentInstance.
 
 #### AgentExecutionLog
-Log de auditoría técnica por ejecución (I21). Sin exponer modelos/versiones/parámetros al cliente.
+Log de auditoría técnica por ejecución (I21). Registra eventos y detalles cronológicos vinculados a `AgentExecution`; no sustituye `AgentExecution.effectiveConfigSnapshot`, que es la fuente de verdad de las referencias inmutables de configuración y Knowledge de P10. Sin exponer modelos/versiones/parámetros al cliente.
 
 | Campo | Tipo | Obligatorio | Descripción |
 |-------|------|-------------|-------------|
@@ -335,89 +337,24 @@ Registro append-only de movimientos de créditos (P4). Idempotente por combinaci
 ## B. Diagrama de entidades y relaciones (to-be)
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          WABY (PLATAFORMA)                                  │
-│                                                                             │
-│  ┌─────────────────┐                                                       │
-│  │ AgentDefinition │◄──┐                                                   │
-│  │ (propiedad Waby)│   │                                                   │
-│  └─────────────────┘   │                                                   │
-│         ┌─────────────┘                                                   │
-│         │ 1:N                                                             │
-│         │                                                                 │
-│         ▼                                                                 │
-└─────────────────────────────────────────────────────────────────────────────┘
-         │ N:1
-         ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         ORGANIZACIÓN                                        │
-│                                                                             │
-│  ┌───────────────────────────────┐                                          │
-│  │ OrganizationAICredit          │                                          │
-│  │ (bolsa única, 1:1)            │                                          │
-│  └───────────────────────────────┘                                          │
-│         ▲                                                                   │
-│         │ 1:N                                                               │
-│         │                                                                   │
-│         ▼                                                                   │
-│  ┌───────────────────────────────┐                                          │
-│  │ OrganizationAICredit          │                                          │
-│  │ (bolsa única, 1:1)            │                                          │
-│  └───────────────────────────────┘                                          │
-│         ▲                                                                   │
-│         │ 1:N                                                               │
-│         │                                                                   │
-│         ▼                                                                   │
-│  ┌─────────────────────────────────────────────────────────────────┐        │
-│  │ ExecutionBudgetAuthorization                            │        │
-│  │ (presupuesto autorizado por ejecución)                   │        │
-│  │ executionId, fencingGeneration, status                  │        │
-│  └─────────────────────────────────────────────────────────────────┘        │
-│         ▲                                                                   │
-│         │ 1:N                                                               │
-│         │                                                                   │
-│         ▼                                                                   │
-│  ┌─────────────────────────────────────────────────────────────────┐        │
-│  │ ExecutionBudgetAllocation                             │        │
-│  │ (asignación por invocación)                              │        │
-│  │ invocationId, fencingGeneration, status               │        │
-│  └─────────────────────────────────────────────────────────────────┘        │
-│         ▲                                                                   │
-│         │ 1:N                                                               │
-│         │                                                                   │
-│         ▼                                                                   │
-└─────────────────────────────────────────────────────────────────────────────┘
-          │ N
-          ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         WORKSPACE (CLIENTE)                                 │
-│                                                                             │
-│  ┌─────────────────┐                                                       │
-│  │ AgentInstance   │      ┌─────────────────────┐                          │
-│  │ (propiedad WS)  │──────│ AgentExecution      │                          │
-│  │                 │      │ (auditoría)         │                          │
-│  └─────────────────┘      └─────────────────────┘                          │
-│         │ N                                                                   │
-│         │                                                                   │
-│         ▼                                                                   │
-│  ┌─────────────────┐      ┌─────────────────────┐                          │
-│  │ ConversationMem │      │ SkillConfig         │                          │
-│  │ (ventana 20 msgs│      │ (por instancia)     │                          │
-│  └─────────────────┘      └─────────────────────┘                          │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────┐        │
-│  │ AgentRules (por instancia)                                 │        │
-│  └─────────────────────────────────────────────────────────────────┘        │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────┐        │
-│  │ WorkspaceKnowledge (compartido por todas las instancias del WS) │        │
-│  └─────────────────────────────────────────────────────────────────┘        │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────────────┐│
-│  │ CreditLedger (append-only, por Organización)                           ││
-│  │ workspaceId = dimensión de atribución                                ││
-│  └─────────────────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────────────────┘
+WABY (PLATAFORMA)
+  AgentDefinition
+       │ 1:N
+       ▼
+WORKSPACE
+  AgentInstance ───────────── AgentExecution
+       │                           │
+       ├── SkillConfiguration      └── AgentExecutionLog
+       ├── AgentRules
+       ├── ConversationMemory
+       └── WorkspaceKnowledge (compartido por las instancias del Workspace)
+
+ORGANIZACIÓN
+  Organization
+       ├── OrganizationAICredit (1:1)
+       │        └── ExecutionBudgetAuthorization (1:N)
+       │                 └── ExecutionBudgetAllocation (1:N)
+       └── CreditLedger (append-only; workspaceId es dimensión de atribución)
 ```
 
 ### Propiedad por capa
@@ -528,7 +465,7 @@ Se definen dos hashes con propósitos distintos:
 | `promptSnapshotHash` | Prompt efectivo construido | systemPrompt, Rules contenido, Skills contenido, knowledgeBaseIds (IDs solo, no contenido), mensajes de memoria, historial | Serialización JSON ordenada por clave, sin espacios, sin secretos |
 | `effectiveConfigHash` | Configuración efectiva completa | AgentDefinition.id + version, agentInstanceId, skill IDs + versiones, rule IDs + versiones, capability IDs, provider, model, temperatura, maxTokens, knowledgeBaseIds | Serialización JSON ordenada por clave, sin espacios, sin secretos, sin credenciales |
 
-**Nota importante:** Ningún hash por sí solo permite reconstruir una ejecución. `promptSnapshotHash` identifica el prompt; `effectiveConfigHash` identifica la configuración. Para reproducibilidad completa se requiere `effectiveConfigSnapshot` (copia persistida de valores efectivos) o acceso a las versiones inmutables de AgentDefinition, Rules y Skills referenciadas.
+**Nota importante:** Ningún hash por sí solo permite reconstruir una ejecución. `promptSnapshotHash` identifica el prompt; `effectiveConfigHash` identifica la configuración. Cada ejecución debe conservar `effectiveConfigSnapshot` con las referencias identificables y versionadas obligatorias. El acceso posterior a las versiones inmutables permite resolver esas referencias, pero no sustituye la persistencia del snapshot en la ejecución.
 
 ---
 
@@ -553,7 +490,7 @@ El snapshot puede incluir además una copia de los valores efectivos (por ejempl
 
 `knowledgeBaseIds` identifica las bases de Knowledge habilitadas para la instancia, pero **no** registra el contenido efectivamente recuperado durante la ejecución.
 
-Para auditoría de qué contexto recibió la ejecución, se registra obligatoriamente en `effectiveConfigSnapshot` o en un `AgentExecutionLog` vinculado a la ejecución:
+Para auditoría de qué contexto recibió la ejecución, se registra obligatoriamente en `AgentExecution.effectiveConfigSnapshot`. `AgentExecutionLog` puede registrar eventos y referencias de auditoría adicionales, pero no sustituye el snapshot obligatorio ni constituye una ubicación alternativa para sus referencias de Nivel 1 y Nivel 2:
 
 - IDs de las fuentes/documentos recuperados de Qdrant y su versión publicada.
 - IDs de los fragmentos efectivamente incorporados al prompt, con su versión/revisión disponible.
@@ -579,7 +516,7 @@ Si una fuente o fragmento no dispone de versionado propio, se conserva su identi
 | Costo de almacenamiento | Bajo | Medio | Mayor |
 | Uso recomendado | Auditoría obligatoria de configuración por ejecución | Auditoría obligatoria del contexto RAG utilizado | Reproducción técnica adicional de condiciones de entrada (P7) |
 
-**Decisión de diseño:** Los niveles 1 y 2 son obligatorios para cada ejecución y sus referencias se conservan en `effectiveConfigSnapshot` o en registros `AgentExecutionLog` vinculados. La copia completa de valores efectivos del Nivel 3 es complementaria y puede optimizarse por almacenamiento, pero nunca se degradan ni omiten las referencias versionadas de configuración, documentos y fragmentos realmente utilizados.
+**Decisión de diseño:** Los niveles 1 y 2 son obligatorios para cada ejecución y sus referencias se conservan en `AgentExecution.effectiveConfigSnapshot`, que es la fuente de verdad del snapshot inmutable. `AgentExecutionLog` registra eventos cronológicos y puede incluir referencias al snapshot, pero no lo sustituye ni almacena una copia alternativa de sus referencias obligatorias. La copia completa de valores efectivos del Nivel 3 es complementaria y puede optimizarse por almacenamiento, pero nunca se degradan ni omiten las referencias versionadas de configuración, documentos y fragmentos realmente utilizados.
 
 **Limitación importante:** Ningún nivel garantiza reproducibilidad exacta de la respuesta LLM. Los modelos de lenguaje son no deterministas, los proveedores pueden cambiar sus modelos, y las herramientas externas pueden devolver resultados diferentes. El snapshot garantiza trazabilidad de la configuración de entrada (Nivel 1) y del contexto (Nivel 2), no reproducibilidad de la salida (Nivel 3 solo reproduce condiciones de entrada, no el resultado exacto).
 
@@ -1149,16 +1086,26 @@ El contexto enviado al proveedor LLM sigue este orden estricto:
 | Temperatura | Waby (central) | ❌ No |
 | Max tokens | Waby (central) | ❌ No |
 | TopP, penalties | Waby (central) | ❌ No |
-| Credenciales API | Waby (central, cifradas) | ❌ No |
+| Credenciales API de proveedores LLM | Waby (central, cifradas) | ❌ No |
+| Credenciales de integraciones empresariales | Workspace, mediante usuarios autorizados y solo para integraciones permitidas | Sí, dentro de la allowlist y políticas Waby |
 
 **Implementación:** Tabla de rutas central y versionada (configuración, no código) que resuelve un único proveedor y modelo LLM activo por AgentDefinition (P8). La estructura podrá admitir proveedores de respaldo en el futuro, pero en esta fase cada AgentDefinition utiliza un solo LLM: no hay rotación ni fallback entre proveedores. Los reintentos técnicos, si se habilitan, se realizan contra el mismo proveedor/modelo. Esta configuración nunca se expone por API al cliente.
 
-### G.2 Credenciales administradas por Waby (I6)
+### G.2 Credenciales de proveedores LLM administradas por Waby (I6)
 
 - Las API keys de proveedores LLM son gestionadas exclusivamente por Waby.
 - Cifradas en reposo (AES-256-GCM o equivalente).
 - Nunca expuestas al cliente, ni en respuestas de API, ni en logs.
 - La `aiCredential` per-bot del modelo actual se elimina; se reemplaza por credenciales centralizadas de Waby asociadas al routing de proveedores.
+
+Esta regla se limita a credenciales de proveedores LLM y no transfiere a Waby la administración de credenciales de integraciones empresariales del Workspace.
+
+### G.2.1 Credenciales de integraciones empresariales administradas por Workspace
+
+- Los usuarios autorizados del Workspace configuran, actualizan y revocan las credenciales de las integraciones empresariales que Waby habilita para sus AgentInstance.
+- Waby define la allowlist de integraciones, las capacidades disponibles y las políticas de seguridad; no administra las cuentas ni decide los valores de las credenciales empresariales del cliente.
+- `SkillConfiguration.credentials` contiene únicamente referencias a credenciales (IDs), nunca sus valores secretos. La resolución y el uso de esos secretos se realizan mediante el mecanismo seguro de credenciales de la plataforma.
+- Los valores secretos de credenciales empresariales nunca se copian a `effectiveConfigSnapshot`, prompts, logs ni metadatos de ledger. Cuando sea necesaria trazabilidad, puede conservarse únicamente una referencia identificable/versionada no secreta.
 
 ### G.3 Cálculo de tokens
 
@@ -1567,7 +1514,7 @@ Los desgloses por Workspace y AgentInstance son estadísticas y atribución. No 
 | `Bot` (definición + instancia mezcladas) | Separar → `AgentDefinition` (Waby) + `AgentInstance` (Workspace) | `Bot` mezcla definición e instancia (Fase 1) | I1, I2, I16 |
 | `BotInstance` | Adaptar → `AgentInstance` (propiedad Workspace) | Ya existe, cambiar propiedad y campos | I2, I16 |
 | `ModelConfiguration` por bot | Reemplazar → routing central Waby | Configurable por bot hoy, debe ser Waby | I18 |
-| Credencial per-bot (D*-cred) | Reemplazar → credenciales centralizadas Waby | Cliente gestiona API keys hoy (violación I6) | I6 |
+| Credencial per-bot (D*-cred) | Reemplazar → credenciales LLM centralizadas Waby | Cliente gestiona API keys de proveedor LLM hoy (violación I6) | I6 |
 | `enabledCapabilities` global en pipeline | Separar → filtrar por instancia | `findAll()` carga todas (Fase 1, R7) | I8, I12 |
 | RAG filtro `config.workspaceId` | Conservar → `WorkspaceKnowledge` | Cumple I11 (compartido por workspace) | I11 |
 | `memory-manager` (30 facts) | Reemplazar → `ConversationMemory` (ventana 20) | No existe ventana 20 (Fase 1, R10) | I14 |
@@ -1585,7 +1532,7 @@ Los desgloses por Workspace y AgentInstance son estadísticas y atribución. No 
 | workspaceId | AgentInstance.workspaceId | Denormalizado, validado cross-tenant |
 | name | AgentInstance.name | Nombre visible al cliente |
 | model (provider, name, temp, etc.) | AgentDefinition (campos de proveedor) | Waby centraliza, migra a definición |
-| aiCredential | Eliminado | Credenciales centralizadas en Waby |
+| aiCredential | Eliminado | Credenciales de proveedores LLM centralizadas en Waby |
 | enabledCapabilities | SkillConfiguration (por instancia) | Migrado como skills de la instancia |
 | knowledgeBaseIds | AgentInstance.knowledgeBaseIds | Referencias a WorkspaceKnowledge |
 | promptId / activePromptVersionId | AgentDefinition (prompt del sistema) | La definición lleva el prompt base |
@@ -1620,7 +1567,7 @@ Cada `BotInstance` actual se migra a `AgentInstance`:
 
 ### H.7 Credenciales
 
-- `aiCredential` per-bot → Eliminado. Credenciales gestionadas centralmente por Waby.
+- `aiCredential` per-bot → Eliminado. Credenciales de proveedores LLM gestionadas centralmente por Waby.
 - Los clientes ya no aportan API keys (I6).
 
 ### H.8 Execution y costos
@@ -1710,7 +1657,7 @@ El trabajo se agrupa por responsabilidad arquitectónica (datos, provisioning, r
 **Consecuencias:**
 - Requiere migración de datos de Bot a AgentDefinition + AgentInstance.
 - Los clientes ya no crean ni editan definiciones (solo instancias).
-- Waby gestiona proveedor, modelo, credenciales centralizadas.
+- Waby gestiona proveedor, modelo y credenciales LLM centralizadas.
 
 ---
 
