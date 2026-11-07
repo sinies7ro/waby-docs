@@ -19,7 +19,7 @@ Esta fase diseña la transformación del modelo actual **Bot / BotInstance** en 
 
 El diseño se basa en los hallazgos de la Fase 1 (WAB-77, [informe consolidado](../audits/wab-77/informe-consolidado-fase-1.md)) y toma como referencia las invariantes I1–I21 de WAB-75 §2. La antigua I3 relativa a cupos comerciales queda supersedida por P1 aprobada: no hay límite comercial de AgentInstance por Workspace ni Organización.
 
-**Decisiones resueltas que no se reabren:** P1 (sin cupo comercial), P2 (reglas funcionales de asignación y routing consolidadas en DEC-CM-04/06/08), P3 (modelo híbrido ARQ-19 y permisos ARQ-20), P4 (política híbrida G.4.6 aprobada), P9 (cinco estados; pendientes solo los detalles de retiro indicados), P10 (snapshot inmutable por ejecución; versionado/retención de Knowledge aún pendiente). Permanecen abiertos los contratos técnicos enumerados al final y en Linear.
+**Decisiones resueltas que no se reabren:** P1 (sin cupo comercial), P2 (reglas funcionales de asignación y routing consolidadas en DEC-CM-04/06/08), P3 (modelo híbrido ARQ-19 y permisos ARQ-20), P4 (política híbrida G.4.6 aprobada), P9 (cinco estados; pendientes solo los detalles de retiro indicados), P10 (snapshot inmutable por ejecución con referencias identificables/versionadas de configuración y Knowledge; permanecen pendientes la política de publicación, ciclo de versionado y retención de Knowledge). Permanecen abiertos los contratos técnicos enumerados al final y en Linear.
 
 ---
 
@@ -115,7 +115,7 @@ Ejecución individual de un agente para procesar un mensaje de usuario.
 | input | String | Sí | Mensaje de entrada |
 | promptSnapshotHash | String | Sí | SHA-256 del prompt efectivo construido (I21, P7) |
 | effectiveConfigHash | String | Sí | SHA-256 de la configuración efectiva completa (AgentDefinition, Rules, Skills, capabilities, provider, modelo, routing, parámetros) (P10) |
-| effectiveConfigSnapshot | JSON | No | Copia persistida de la configuración efectiva inmutable (sin secretos) para reproducibilidad técnica (P7, P10) |
+| effectiveConfigSnapshot | JSON | Sí | Snapshot inmutable sin secretos. Incluye como mínimo referencias identificables y versionadas de AgentDefinition, Skills y SkillConfiguration, Rules, capabilities, Knowledge Bases, documentos y fragmentos incorporados al contexto; puede incluir valores efectivos adicionales para reproducibilidad técnica (P7, P10) |
 | providerModelUsed | String | Sí | Proveedor y modelo realmente usado (I21) |
 | inputTokens | Integer | Sí | Tokens de entrada |
 | outputTokens | Integer | Sí | Tokens de salida |
@@ -275,14 +275,14 @@ Autorización temporal de presupuesto para una ejecución lógica. Representa la
 - `activeAllocatedBudget` es igual a la suma de `assignedBudget` de todas las asignaciones con `status` en `('assigned', 'executing', 'settling', 'reconciliation_required')` de esta autorización.
 
 #### ExecutionBudgetAllocation
-Asignación temporal de presupuesto para una invocación individual dentro de una `ExecutionBudgetAuthorization`. Representa la capacidad económica temporalmente asignada a una invocación concreta al proveedor LLM (incluidos retries y fallbacks) dentro del presupuesto de una ejecución lógica. Una ejecución puede tener múltiples asignaciones simultáneas para invocaciones paralelas, pero la suma de sus `assignedBudget` activos no puede superar el `authorizedBudget` de su autorización padre.
+Asignación temporal de presupuesto para una invocación individual dentro de una `ExecutionBudgetAuthorization`. Representa la capacidad económica temporalmente asignada a una invocación concreta al proveedor LLM (incluidos reintentos contra el mismo proveedor/modelo) dentro del presupuesto de una ejecución lógica. Una ejecución puede tener múltiples asignaciones simultáneas para invocaciones paralelas, pero la suma de sus `assignedBudget` activos no puede superar el `authorizedBudget` de su autorización padre.
 
 | Campo | Tipo | Obligatorio | Descripción |
 |-------|------|-------------|-------------|
 | allocationId | UUID | Sí | Identificador único de la asignación |
 | authorizationId | UUID | Sí | Referencia a la `ExecutionBudgetAuthorization` padre |
 | executionId | UUID | Sí | Ejecución lógica a la que pertenece |
-| invocationId | String | Sí | Identificador de la invocación concreta al proveedor LLM, incluidos retries y fallbacks |
+| invocationId | String | Sí | Identificador de la invocación concreta al proveedor LLM, incluidos reintentos contra el mismo proveedor/modelo |
 | attemptId | String | Sí | Identifica el intento/worker propietario de esta invocación; cambia al recuperar o reasignar la asignación |
 | assignedBudget | Decimal | Sí | Presupuesto asignado a esta invocación; permanece inmutable como dato histórico después de su liquidación |
 | consumedAmount | Decimal | No | Usage reconocido por el proveedor para esta invocación; se registra incluso cuando el consumo sea absorbido por Waby |
@@ -313,9 +313,10 @@ Registro append-only de movimientos de créditos (P4). Idempotente por combinaci
 | executionId | UUID | Sí | Referencia a AgentExecution (idempotency key para débitos) |
 | refundRequestId | UUID | No | Para asientos `refund`: clave de idempotencia propia de la solicitud de devolución. Permite reintentar una devolución sin duplicarla. |
 | movementId | UUID | Sí | Identificador único del asiento (generado al crear; para trazabilidad y auditoría) |
-| originalExecutionId | UUID | No | Para asientos `refund`: referencia al `executionId` del débito original que se compensa |
+| originalMovementId | UUID | No | Para asientos `refund`: referencia directa al `movementId` del débito original compensado |
+| originalExecutionId | UUID | No | Referencia complementaria al `executionId` asociado al débito original compensado |
 | agentInstanceId | UUID | Sí | Instancia que generó el consumo |
-| type | Enum | Sí | `deduct` / `refund` / `purchase` |
+| type | Enum | Sí | `deduct` / `refund` / `purchase` / `adjustment` |
 | amount | Decimal | Sí | Cantidad de créditos |
 | currency | String | Sí | Moneda (default USD) |
 | description | String | Sí | Descripción del movimiento |
@@ -323,11 +324,11 @@ Registro append-only de movimientos de créditos (P4). Idempotente por combinaci
 | createdAt | Timestamp | Sí | Fecha del movimiento |
 | completedAt | Timestamp | No | Fecha de completación |
 
-**Cardinalidad:** Una Organización puede tener cero o más CreditLedger (1:N). Para movimientos `deduct`, la combinación `(organizationId, executionId)` aparece como máximo una vez (idempotencia, P4). Para movimientos `refund`, la combinación `(organizationId, refundRequestId)` aparece como máximo una vez (idempotencia de la solicitud de devolución). Múltiples asientos `refund` pueden referenciar el mismo `originalExecutionId` (devoluciones parciales o múltiples), pero la suma de todos no puede superar el monto del débito original.
+**Cardinalidad:** Una Organización puede tener cero o más CreditLedger (1:N). Para movimientos `deduct`, la combinación `(organizationId, executionId)` aparece como máximo una vez (idempotencia, P4). Para movimientos `refund`, la combinación `(organizationId, refundRequestId)` aparece como máximo una vez (idempotencia de la solicitud de devolución). Múltiples asientos `refund` pueden referenciar el mismo `originalMovementId` (devoluciones parciales o múltiples), y conservar el `originalExecutionId` como referencia complementaria. La suma de todos los refunds asociados a ese movimiento no puede superar su monto.
 
-**Nota de integridad:** `CreditLedger` es append-only. Una reversión se representa como un asiento `refund` nuevo que referencia al débito original vía `originalExecutionId`. No existe `status: reversed` ni modificación de asientos existentes. Los movimientos `refund` y `purchase` no están sujetos a la restricción única de `(organizationId, executionId)`.
+**Nota de integridad:** `CreditLedger` es append-only. Una reversión se representa como un asiento `refund` nuevo que referencia directamente al débito original vía `originalMovementId`; `originalExecutionId` se conserva como referencia complementaria. No existe `status: reversed` ni modificación de asientos existentes. Los movimientos `refund` y `purchase` no están sujetos a la restricción única de `(organizationId, executionId)`.
 
-**Validación atómica de devoluciones:** Antes de registrar un asiento `refund`, el sistema verifica dentro de la misma transacción que `SUM(amount de refunds existentes para originalExecutionId) + amount del nuevo refund <= amount del débito original referenciado`. Esta verificación y la escritura ocurren en la misma transacción de MongoDB para prevenir sobre-devoluciones bajo concurrencia.
+**Validación atómica de devoluciones:** Antes de registrar un asiento `refund`, el sistema verifica dentro de la misma transacción que `SUM(amount de refunds existentes para originalMovementId) + amount del nuevo refund <= amount del movimiento de débito original referenciado`. Esta verificación y la escritura ocurren en la misma transacción de MongoDB para prevenir sobre-devoluciones bajo concurrencia.
 
 ---
 
@@ -437,12 +438,12 @@ Registro append-only de movimientos de créditos (P4). Idempotente por combinaci
 3. **AgentInstance.workspaceId** es denormalizado para consultas rápidas; validado cross-tenant en escritura.
 4. **WorkspaceKnowledge.workspaceId** — todas las instancias del mismo workspace comparten el mismo knowledge (I11).
 5. **SkillConfiguration.agentInstanceId** y **AgentRules.agentInstanceId** — exclusivos por instancia, sin herencia (I12, I13).
-6. **CreditLedger:** para movimientos `deduct`, la combinación `(organizationId, executionId)` es única (idempotencia, P4). Los movimientos `refund` y `purchase` no están sujetos a esta restricción única (permiten múltiples asientos para un mismo `executionId`, ej. devoluciones parciales). `originalExecutionId` referencia el débito original en asientos `refund`.
+6. **CreditLedger:** para movimientos `deduct`, la combinación `(organizationId, executionId)` es única (idempotencia, P4). Los movimientos `refund` y `purchase` no están sujetos a esta restricción única; varios refunds pueden asociarse al mismo `originalMovementId` para devoluciones parciales, conservando `originalExecutionId` como correlación de negocio. `originalMovementId` referencia directamente el movimiento de débito original en asientos `refund`; `originalExecutionId` permite asociarlo además con la ejecución de negocio.
 7. **AgentExecution.id** = execution_id, usado como idempotency key en CreditLedger para movimientos `deduct` (P4).
-8. **CreditLedger no tiene estado `reversed` ni `pending`:** los asientos son `completed` o `failed`. Una reversión es un asiento `refund` nuevo que referencia al débito original vía `originalExecutionId`.
+8. **CreditLedger no tiene estado `reversed` ni `pending`:** los asientos son `completed` o `failed`. Una reversión es un asiento `refund` nuevo que referencia al débito original vía `originalMovementId`, conservando `originalExecutionId` como dato complementario.
 9. **ExecutionBudgetAuthorization:** la combinación `(organizationId, executionId)` con `status` en `('authorized', 'executing', 'settling', 'reconciliation_required')` aparece como máximo una vez (una ejecución no puede tener dos autorizaciones que retengan capacidad simultáneamente). `fencingGeneration` se incrementa únicamente al recuperar/reasignar la autorización a otro worker; la renovación normal del lease conserva la generación.
-10. **ExecutionBudgetAllocation:** la combinación `(authorizationId, invocationId)` con `status` en `('assigned', 'executing')` aparece como máximo una vez (una invocación no puede tener dos asignaciones activas simultáneas). `fencingGeneration` se incrementa únicamente al recuperar/reasignar la asignación a otro worker; la renovación normal del lease conserva la generación. `activeAllocatedBudget` debe coincidir con la suma de `assignedBudget` de las asignaciones con `status` en `('assigned', 'executing', 'settling', 'reconciliation_required')` y nunca puede superar `authorizedBudget` menos `consumedAmount`.
-11. **OrganizationAICredit.committedBudget** debe ser siempre igual a la suma de `authorizedBudget` de todas las `ExecutionBudgetAuthorization` con status `authorized` o `executing` para esa organización.
+10. **ExecutionBudgetAllocation:** la combinación `(authorizationId, invocationId)` con `status` en `('assigned', 'executing', 'settling', 'reconciliation_required')` aparece como máximo una vez (una invocación no puede tener dos asignaciones que retengan capacidad simultáneamente). `fencingGeneration` se incrementa únicamente al recuperar/reasignar la asignación a otro worker; la renovación normal del lease conserva la generación. `activeAllocatedBudget` debe coincidir con la suma de `assignedBudget` de las asignaciones con esos mismos estados y nunca puede superar `authorizedBudget` menos `consumedAmount`.
+11. **OrganizationAICredit.committedBudget** debe ser siempre igual a la suma de `authorizedBudget` de todas las `ExecutionBudgetAuthorization` con status `authorized`, `executing`, `settling` o `reconciliation_required` para esa organización.
 
 ---
 
@@ -476,7 +477,7 @@ El Administrador de Organización no obtiene por ese solo rol permisos para admi
 
 ### C.4 Múltiples instancias de una misma definición
 
-Se permiten múltiples AgentInstances derivadas de una misma AgentDefinition, incluso dentro del mismo Workspace. Cada AgentInstance mantiene su configuración empresarial y su propio estado. No existe routing persistente por canal ni asociación permanente canal → instancia. La selección de instancia se resuelve mediante ContactAssignment y, cuando no existe asignación activa, mediante la instancia predeterminada del Workspace conforme a DEC-CM-04/06/08.
+Se permiten múltiples AgentInstances derivadas de una misma AgentDefinition, incluso dentro del mismo Workspace. Cada AgentInstance mantiene su configuración empresarial y su propio estado. No existe routing persistente por canal ni asociación permanente canal → instancia. La selección de instancia se resuelve mediante ContactAssignment y, cuando el contacto no tiene asignación humana ni asignación a una AgentInstance, mediante la instancia predeterminada del Workspace conforme a DEC-CM-04/06/08.
 
 ### C.5 Concurrencia y restricciones de unicidad
 
@@ -533,12 +534,18 @@ Se definen dos hashes con propósitos distintos:
 
 #### C.7.2 Configuración inmutable: snapshot persistido vs referencias mutables
 
-El snapshot **no es solo una lista de IDs** que se vuelven a resolver contra registros mutables. Para garantizar que la ejecución conserve la configuración efectiva original aunque se actualicen AgentDefinition, Rules, Skills, capabilities o routing:
+El snapshot **no es solo una lista de IDs** que se vuelven a resolver contra registros mutables. Cada ejecución conserva referencias estables y versionadas de la configuración y del contexto realmente utilizados, de modo que los cambios posteriores no alteren la evidencia histórica.
 
-- **Opción recomendada (reproducibilidad completa):** `effectiveConfigSnapshot` almacena una copia persistida (JSON) de los valores efectivos utilizados: texto del systemPrompt, contenido de Rules, definición de Skills, lista de capabilities, proveedor, modelo, parámetros. Esto permite reconstruir exactamente qué vio el modelo en esa ejecución.
-- **Opción alternativa (trazabilidad suficiente):** Solo se almacenan IDs y versiones (AgentDefinition.id+version, Rule.id+version, Skill.id+version). Esto permite auditar qué configuración se usó, pero no reconstruir el prompt exacto si los registros mutables cambiaron.
+`effectiveConfigSnapshot` es obligatorio y contiene, como mínimo:
 
-**Decisión de diseño:** Se almacena `effectiveConfigSnapshot` como JSON (sin secretos) para reproducibilidad técnica (P7). Si por razones de almacenamiento no es viable, se documenta que solo hay trazabilidad suficiente (IDs + versiones), no reproducibilidad completa.
+- AgentDefinition: `id` y versión publicada.
+- Skills y configuración efectiva: IDs y versiones de Skill y SkillConfiguration.
+- Rules: IDs y versiones de las reglas aplicadas.
+- Capabilities: identificadores y versión/revisión cuando el catálogo la exponga.
+- Knowledge: IDs de las Knowledge Bases habilitadas, documentos recuperados con su versión y fragmentos efectivamente incorporados al contexto con sus IDs, versión/revisión disponible y hash de contenido.
+- Referencias de proveedor/modelo y parámetros técnicos efectivos no secretos.
+
+El snapshot puede incluir además una copia de los valores efectivos (por ejemplo, texto de Rules/Skills y prompt) para mejorar la reproducibilidad técnica. Esa copia adicional no sustituye las referencias identificables/versionadas obligatorias ni autoriza almacenar secretos.
 
 ---
 
@@ -546,12 +553,14 @@ El snapshot **no es solo una lista de IDs** que se vuelven a resolver contra reg
 
 `knowledgeBaseIds` identifica las bases de Knowledge habilitadas para la instancia, pero **no** registra el contenido efectivamente recuperado durante la ejecución.
 
-Para auditoría de qué contexto recibió la ejecución, se registra opcionalmente en `AgentExecutionLog` o en un campo asociado:
+Para auditoría de qué contexto recibió la ejecución, se registra obligatoriamente en `effectiveConfigSnapshot` o en un `AgentExecutionLog` vinculado a la ejecución:
 
-- IDs de las fuentes/documentos recuperados de Qdrant.
-- Versiones de documentos o chunks cuando existan.
-- Hashes de fragmentos utilizados en el prompt (para detectar si cambió el contenido entre ejecuciones).
-- Metadatos suficientes para auditar el contexto, sin duplicar indiscriminadamente todo el contenido sensible.
+- IDs de las fuentes/documentos recuperados de Qdrant y su versión publicada.
+- IDs de los fragmentos efectivamente incorporados al prompt, con su versión/revisión disponible.
+- Hashes de contenido de esos fragmentos para detectar cambios entre ejecuciones.
+- Metadatos suficientes para identificar y auditar el contexto, sin duplicar indiscriminadamente todo el contenido sensible.
+
+Si una fuente o fragmento no dispone de versionado propio, se conserva su identificador estable y el hash del contenido utilizado; no se debe omitir la referencia por falta de un campo de versión.
 
 **Diferenciación:**
 - **Configuración de Knowledge habilitada:** `knowledgeBaseIds` en el snapshot (qué bases estaban disponibles).
@@ -564,13 +573,13 @@ Para auditoría de qué contexto recibió la ejecución, se registra opcionalmen
 
 | Aspecto | Nivel 1: Reconstrucción de configuración | Nivel 2: Trazabilidad del contexto | Nivel 3: Reproducción de ejecución |
 |---------|------------------------------------------|--------------------------------------|------------------------------------|
-| Qué se almacena | AgentDefinition.id+version, Rule.id+version, Skill.id+version, capability IDs, knowledgeBaseIds | IDs de fragmentos Qdrant, versiones de documentos/chunks, hashes de fragmentos utilizados | `effectiveConfigSnapshot` (JSON con valores efectivos, sin secretos) |
-| Puede reconstruir el prompt exacto | ❌ No | ❌ No | ✅ Sí (condiciones de entrada) |
+| Qué se almacena | AgentDefinition.id+version, Rule.id+version, Skill.id+version, SkillConfiguration.id+version, capability IDs/versiones disponibles, provider/model, parámetros y knowledgeBaseIds | IDs/versiones de documentos y chunks recuperados; IDs y hashes de los fragmentos efectivamente incorporados al contexto | Copia adicional de valores efectivos (sin secretos), cuando se requiera mayor reproducibilidad |
+| Puede reconstruir el prompt exacto | ❌ No, por referencias solamente | ❌ No, por referencias solamente | Puede reconstruir las condiciones de entrada; no garantiza la salida exacta |
 | Puede reproducir respuesta LLM exacta | ❌ No | ❌ No | ❌ No (modelos no deterministas) |
 | Costo de almacenamiento | Bajo | Medio | Mayor |
-| Uso recomendado | Auditoría de configuración de entrada | Auditoría de contexto RAG recibido | Reproducción técnica de condiciones de entrada (P7) |
+| Uso recomendado | Auditoría obligatoria de configuración por ejecución | Auditoría obligatoria del contexto RAG utilizado | Reproducción técnica adicional de condiciones de entrada (P7) |
 
-**Decisión de diseño:** Se almacena `effectiveConfigSnapshot` para Nivel 3. Si esto resulta prohibitivo en almacenamiento, se degrada a Nivel 1 (IDs + versiones) y se documenta explícitamente. El Nivel 2 (trazabilidad RAG) se registra opcionalmente en `AgentExecutionLog`.
+**Decisión de diseño:** Los niveles 1 y 2 son obligatorios para cada ejecución y sus referencias se conservan en `effectiveConfigSnapshot` o en registros `AgentExecutionLog` vinculados. La copia completa de valores efectivos del Nivel 3 es complementaria y puede optimizarse por almacenamiento, pero nunca se degradan ni omiten las referencias versionadas de configuración, documentos y fragmentos realmente utilizados.
 
 **Limitación importante:** Ningún nivel garantiza reproducibilidad exacta de la respuesta LLM. Los modelos de lenguaje son no deterministas, los proveedores pueden cambiar sus modelos, y las herramientas externas pueden devolver resultados diferentes. El snapshot garantiza trazabilidad de la configuración de entrada (Nivel 1) y del contexto (Nivel 2), no reproducibilidad de la salida (Nivel 3 solo reproduce condiciones de entrada, no el resultado exacto).
 
@@ -770,14 +779,15 @@ Entrada (RabbitMQ / HTTP interno)
 ┌─────────────────────────┐
 │ 3. Resolver instancia   │  Buscar AgentInstance por id + workspaceId.
 │    + verificar estado   │  status debe ser 'active'. Si no → rechazar.
-│    + verificar cupo     │                                                   │
 └─────────────────────────┘
         │
         ▼
 ┌─────────────────────────┐
-│ 4. Vigencia G1          │  Bot activo, contacto no asignado a humano,
-│    (fail-open si        │    no hay cambio de asignación. Si falla →
-│    Mongo cae)           │    descartar con ack.                                                   │
+│ 4. Vigencia G1          │  AgentInstance activa, contacto no asignado a humano,
+│    (fail-closed si      │    no hay cambio de asignación. Si MongoDB no
+│    MongoDB no está      │    está disponible o no es posible comprobar
+│    disponible)          │    la vigencia, no ejecutar respuestas ni
+│                         │    acciones que dependan de esa validación.                                                   │
 └─────────────────────────┘
         │
         ▼
@@ -878,9 +888,10 @@ CRM aplica la precedencia de DEC-CM-06:
 
 1. Si existe una asignación humana vigente, la IA no interviene.
 2. Si existe una asignación vigente a una AgentInstance activa del mismo Workspace, esa instancia conserva la atención.
-3. Si no existe asignación activa, ante un nuevo mensaje entrante CRM intenta asignar la única AgentInstance predeterminada del Workspace, únicamente si está activa.
-4. Si no existe una predeterminada activa, el contacto permanece sin asignación.
-5. No existe fallback a otra instancia por prioridad ni selección alternativa.
+3. Si existe una asignación vigente a una AgentInstance inactiva, suspendida o eliminada, se conserva el ContactAssignment pero se impide la atención automática. No hay fallback a otra instancia ni al default. La atención solo se recupera mediante reactivación o reasignación explícita.
+4. Si el contacto no tiene asignación humana ni asignación a una AgentInstance, ante un nuevo mensaje entrante CRM intenta asignar la única AgentInstance predeterminada del Workspace, únicamente si está activa.
+5. Si no existe una predeterminada activa, el contacto permanece sin asignación.
+6. No existe fallback a otra instancia por prioridad ni selección alternativa.
 
 ### E.3 Validación y unicidad
 
@@ -1140,7 +1151,7 @@ El contexto enviado al proveedor LLM sigue este orden estricto:
 | TopP, penalties | Waby (central) | ❌ No |
 | Credenciales API | Waby (central, cifradas) | ❌ No |
 
-**Implementación:** Tabla de rutas central y versionada (configuración, no código) con orden de preferencia y fallbacks (P8). Nunca expuesta por API al cliente.
+**Implementación:** Tabla de rutas central y versionada (configuración, no código) que resuelve un único proveedor y modelo LLM activo por AgentDefinition (P8). La estructura podrá admitir proveedores de respaldo en el futuro, pero en esta fase cada AgentDefinition utiliza un solo LLM: no hay rotación ni fallback entre proveedores. Los reintentos técnicos, si se habilitan, se realizan contra el mismo proveedor/modelo. Esta configuración nunca se expone por API al cliente.
 
 ### G.2 Credenciales administradas por Waby (I6)
 
@@ -1171,7 +1182,7 @@ El contexto enviado al proveedor LLM sigue este orden estricto:
 El flujo de créditos de una ejecución lógica se compone de autorización de capacidad, ejecución, clasificación individual de invocaciones y una única liquidación financiera final:
 
 1. **Autorización del presupuesto:** Antes de invocar al proveedor LLM, el sistema solicita un presupuesto máximo para la ejecución. Dentro de una transacción MongoDB verifica que `OrganizationAICredit.balance - OrganizationAICredit.committedBudget >= presupuesto_solicitado`. Si hay disponibilidad, incrementa `committedBudget` y crea una `ExecutionBudgetAuthorization` con `status = 'authorized'` y su `fencingGeneration` inicial. Si no hay disponibilidad, rechaza la ejecución sin invocar al proveedor.
-2. **Ejecución e invocaciones:** El agente procesa la interacción. Cada invocación al proveedor LLM tiene su propio `invocationId` y asignación de presupuesto; retries y fallbacks de la misma ejecución lógica conservan el `executionId` y utilizan otro `invocationId`.
+2. **Ejecución e invocaciones:** El agente procesa la interacción. Cada invocación al proveedor LLM tiene su propio `invocationId` y asignación de presupuesto; los reintentos contra el mismo proveedor/modelo conservan el `executionId` y utilizan otro `invocationId`; no se contempla fallback entre proveedores.
 3. **Reconocimiento de consumo:** Se obtiene el usage informado por el proveedor para cada invocación y se convierte a créditos mediante la versión de tarifa (`pricingVersion`) aplicable.
 4. **Clasificación financiera:** Cada invocación se clasifica conforme a G.4.6: consumo confirmado y facturable, consumo confirmado absorbido por Waby, o consumo desconocido pendiente de reconciliación. La validez técnica del resultado se evalúa independientemente del resultado del despacho al canal.
 5. **Reconciliación:** Si alguna invocación mantiene un resultado externo desconocido, permanece en `reconciliation_required` y conserva su capacidad comprometida durante el período de gracia aprobado de **30 días** desde su entrada en ese estado. Al vencer sin evidencia suficiente, se excluye únicamente ese consumo desconocido y se libera la asignación correspondiente.
@@ -1232,7 +1243,7 @@ Para permitir concurrencia entre Workspaces sin bloquear toda la Organización, 
 
 #### G.4.2.1.1 Presupuesto por invocación
 
-Cada `ExecutionBudgetAllocation` representa el presupuesto máximo asignado a una invocación concreta al proveedor LLM. Los retries y fallbacks de una misma ejecución lógica usan el mismo `executionId` y un `invocationId` distinto por llamada real al proveedor. Las ejecuciones HTTP de Skills y otras operaciones no-LLM quedan fuera de P4.
+Cada `ExecutionBudgetAllocation` representa el presupuesto máximo asignado a una invocación concreta al proveedor LLM. Los reintentos contra el mismo proveedor/modelo dentro de una ejecución lógica conservan el `executionId` y usan un `invocationId` distinto por cada llamada real al proveedor. Las ejecuciones HTTP de Skills y otras operaciones no-LLM quedan fuera de P4.
 
 **Presupuesto disponible para nuevas invocaciones:**
 
@@ -1364,13 +1375,14 @@ El orden operativo debe permitir clasificar la responsabilidad sobre el despacho
 | `movementId` | Identificador único del asiento en CreditLedger (UUID generado al crear) | No | Clave primaria del asiento |
 | `authorizationId` | Identificador de la autorización de presupuesto (ExecutionBudgetAuthorization.id) | No | Identifica la autorización de presupuesto asociada a una ejecución |
 | `allocationId` | Identificador de la asignación de presupuesto (ExecutionBudgetAllocation.id) | No | Identifica una asignación de presupuesto para una invocación específica |
-| `invocationId` | Identificador de una invocación concreta al proveedor LLM, incluidos retries y fallbacks | No | Identifica una invocación individual y su consumo dentro de una ejecución |
+| `invocationId` | Identificador de una invocación concreta al proveedor LLM, incluidos reintentos contra el mismo proveedor/modelo | No | Identifica una invocación individual y su consumo dentro de una ejecución |
 | `attemptId` | Intento/propietario de procesamiento de una ejecución o invocación | Cambia cuando una recuperación/reasignación entrega el recurso a otro worker | Permite identificar el intento propietario; no es una clave de idempotencia financiera |
 | `fencingGeneration` | Número incremental por autorización o asignación | Incrementa solo al recuperar o reasignar la propiedad a un nuevo worker; una renovación normal del lease conserva la generación | Identifica la generación vigente de una autorización o asignación; usado en validación de liquidación |
 | `refundRequestId` | Para asientos `refund`: clave de idempotencia propia de la solicitud de devolución | No | Permite reintentar una devolución sin duplicarla |
 | Idempotency key (deduct) | Combinación `(organizationId, executionId)` | No | Restricción única en CreditLedger para movimientos `deduct` |
 | Idempotency key (refund) | Combinación `(organizationId, refundRequestId)` | No | Restricción única en CreditLedger para movimientos `refund` |
-| `originalExecutionId` | Para asientos `refund`: referencia al `executionId` del débito original compensado | No | Identifica qué débito se compensa |
+| `originalMovementId` | Para asientos `refund`: referencia al `movementId` del débito original compensado | No | Identifica inequívocamente qué asiento del ledger se compensa |
+| `originalExecutionId` | Referencia complementaria al `executionId` del débito original compensado | No | Relaciona el movimiento con su ejecución de negocio |
 
 **Reglas de idempotencia:**
 
@@ -1384,8 +1396,8 @@ El orden operativo debe permitir clasificar la responsabilidad sobre el despacho
 
 5. **Alcance de las restricciones únicas:** La restricción única `(organizationId, executionId)` aplica **solo a movimientos `deduct`**. La restricción única `(organizationId, refundRequestId)` aplica **solo a movimientos `refund`**. Los movimientos `purchase` no están sujetos a restricción única de ejecución. Esto evita bloquear accidentalmente operaciones legítimas.
 
-**Intentos internos, fallbacks y reintentos del proveedor:**
-- Un retry o fallback que forma parte de la misma ejecución lógica conserva el mismo `executionId` y utiliza otro `invocationId`; sus consumos se clasifican individualmente y se consolidan en el único débito final de esa ejecución.
+**Reintentos técnicos del mismo proveedor:**
+- Un reintento técnico contra el mismo proveedor/modelo dentro de la misma ejecución lógica conserva el `executionId` y utiliza otro `invocationId`; sus consumos se clasifican individualmente y se consolidan en el único débito final de esa ejecución. No se contempla cambiar a un proveedor alternativo.
 - Solo una nueva ejecución de negocio independiente utiliza otro `executionId`, con su propia autorización y su propio débito final.
 - Si una ejecución falla después de haber debitado créditos, no se modifica el débito original; cualquier compensación aprobada se registra mediante un nuevo asiento `refund` conforme a G.4.5 y G.4.6.
 
@@ -1396,7 +1408,7 @@ El orden operativo debe permitir clasificar la responsabilidad sobre el despacho
 - Si el AI Service cae después de escribir en `CreditLedger` pero antes de confirmar la transacción, la transacción se revierte y no hay débito parcial.
 - Si el AI Service cae después de confirmar la transacción pero antes de notificar al cliente, el débito persiste y es idempotente (reintento con mismo `execution_id` no duplica).
 
-**Validación atómica de devoluciones parciales:** Antes de registrar un asiento `refund`, el sistema verifica dentro de la misma transacción que `SUM(amount de refunds existentes para originalExecutionId) + amount del nuevo refund <= amount del débito original referenciado`. Esta verificación y la escritura ocurren en la misma transacción de MongoDB para prevenir sobre-devoluciones bajo concurrencia.
+**Validación atómica de devoluciones parciales:** Antes de registrar un asiento `refund`, el sistema verifica dentro de la misma transacción que `SUM(amount de refunds existentes para originalMovementId) + amount del nuevo refund <= amount del movimiento de débito original referenciado`. Esta verificación y la escritura ocurren en la misma transacción de MongoDB para prevenir sobre-devoluciones bajo concurrencia.
 
 ---
 
@@ -1408,6 +1420,7 @@ El orden operativo debe permitir clasificar la responsabilidad sobre el despacho
 - `deduct`: Débito por ejecución facturable.
 - `refund`: Devolución de créditos (asiento compensatorio, nuevo registro).
 - `purchase`: Compra de créditos (saldo añadido).
+- `adjustment`: Ajuste administrativo del saldo, cuando esté habilitado.
 
 **Estado `status`:**
 - `completed`: El movimiento se aplicó correctamente.
@@ -1418,11 +1431,11 @@ El orden operativo debe permitir clasificar la responsabilidad sobre el despacho
 
 - **Devolución completa:** Un asiento `refund` por el monto total del débito original.
 - **Devolución parcial:** Un asiento `refund` por un monto menor al débito original.
-- **Múltiples devoluciones:** Se pueden registrar varios asientos `refund` para el mismo `originalExecutionId`. La suma de todos los asientos `refund` asociados a un `executionId` **no puede superar** el monto originalmente debitado.
+- **Múltiples devoluciones:** Se pueden registrar varios asientos `refund` para el mismo `originalMovementId`. La suma de todos los asientos `refund` asociados a ese movimiento **no puede superar** el monto originalmente debitado.
 
 **Garantía de no sobre-devolución:** Antes de registrar un asiento `refund`, el sistema verifica que `suma(refunds_existentes) + monto_nuevo <= monto_debito_original`. Esta verificación ocurre dentro de la misma transacción atómica que escribe el asiento `refund`.
 
-**Referencia al débito original:** Cada asiento `refund` lleva `originalExecutionId` que apunta al `executionId` del débito compensado. El débito original permanece inmutable en el ledger.
+**Referencia al débito original:** Cada asiento `refund` lleva `originalMovementId` que apunta al `movementId` del débito compensado y `originalExecutionId` como referencia complementaria a la ejecución asociada. El débito original permanece inmutable en el ledger.
 
 **Decisión sobre devoluciones:** El modelo permite devoluciones completas y parciales, con múltiples asientos `refund` sobre un mismo débito. Si el producto no necesita devoluciones parciales en una fase inicial, esta capacidad puede dejarse sin usar sin afectar la integridad del modelo.
 
@@ -1468,8 +1481,8 @@ La aceptación del canal, el estado `delivered` y la confirmación de lectura **
 | Timeout, consumo confirmado, pero no existe resultado válido por fallo técnico del proveedor | Consumo confirmado | No | No aplica | No | Waby absorbe ese consumo. |
 | Timeout, consumo confirmado, pero Waby interrumpe la generación/procesamiento antes de producir un resultado técnicamente válido | Consumo confirmado | No | No aplica | No | Waby absorbe el consumo correspondiente al fallo bajo su responsabilidad. El caso de resultado válido con fallo de despacho está cubierto por la fila específica de despacho fallido por Waby. |
 | Timeout sin confirmar consumo ni conocer el resultado | Consumo potencial no confirmado | Desconocido | Desconocido | No (pendiente) | `reconciliation_required`; se conserva la capacidad comprometida y no se liquida el débito final de la ejecución mientras siga pendiente. |
-| Retry/fallback dentro de la misma ejecución lógica | Usage por `invocationId` | Según cada invocación | Según cada invocación | Solo el consumo clasificado como facturable se agrega al débito final | Se conserva el mismo `executionId`; cada invocación utiliza su propio `invocationId`. |
-| Retry/fallback como ejecución de negocio independiente | Usage por `invocationId` | Según cada invocación | Según cada invocación | Solo el consumo facturable se agrega al débito final de esa ejecución | Utiliza su propia autorización y clave de ejecución. |
+| Reintento contra el mismo proveedor dentro de la misma ejecución lógica | Usage por `invocationId` | Según cada invocación | Según cada invocación | Solo el consumo clasificado como facturable se agrega al débito final | Se conserva el mismo `executionId`; cada invocación utiliza su propio `invocationId`. |
+| Nueva ejecución de negocio independiente | Usage por `invocationId` | Según cada invocación | Según cada invocación | Solo el consumo facturable se agrega al débito final de esa ejecución | Utiliza su propia autorización y clave de ejecución. |
 | Disconformidad con calidad o pertinencia sin fallo técnico | Consumo confirmado | Sí (técnicamente válido) | Puede existir | Sí | No genera reembolso automático; se trata vía política comercial o soporte independiente. |
 
 **Atribución de responsabilidades por fallo:**
@@ -1495,9 +1508,9 @@ El estado técnico `failed` por sí solo no determina el tratamiento financiero.
 - La clave idempotente del débito es `(organizationId, executionId, type=deduct)`.
 - El consumo de una respuesta parcial válida se calcula exclusivamente con el usage realmente reconocido por el proveedor para esa invocación, convertido mediante `pricingVersion`. No se infiere a partir de la longitud de la respuesta, el porcentaje generado o el presupuesto asignado.
 - Si un fallo se conoce **antes del débito**, el importe facturable se determina directamente según esta política (cero, consumo confirmado parcial o consumo confirmado completo); no se crea un asiento `deduct` por importes que ya se sabe que no son facturables.
-- Si un fallo compensable se conoce **después del débito**, se registra un asiento `refund` idempotente con `originalExecutionId` y `refundRequestId`. La suma de los refunds no puede superar el débito original. La validación del límite de devolución y la actualización del saldo se serializan de forma segura en una transacción MongoDB.
+- Si un fallo compensable se conoce **después del débito**, se registra un asiento `refund` idempotente con `originalMovementId`, `originalExecutionId` y `refundRequestId`. La suma de los refunds no puede superar el débito original. La validación del límite de devolución y la actualización del saldo se serializan de forma segura en una transacción MongoDB.
 
-**Reembolsos y compensaciones:** cuando un fallo atribuible a Waby o al proveedor LLM sin resultado válido se identifica después de un débito y corresponde una compensación conforme a esta política, se crea un asiento `refund` nuevo con `originalExecutionId` y `refundRequestId`. Los reembolsos son asientos nuevos, append-only; no existe estado `reversed`.
+**Reembolsos y compensaciones:** cuando un fallo atribuible a Waby o al proveedor LLM sin resultado válido se identifica después de un débito y corresponde una compensación conforme a esta política, se crea un asiento `refund` nuevo con `originalMovementId`, `originalExecutionId` y `refundRequestId`. Los reembolsos son asientos nuevos, append-only; no existe estado `reversed`.
 
 **Reconciliación de proveedor:** un timeout cuyo resultado externo es desconocido requiere reconciliación basada en capacidades reales del proveedor (request ID, consulta de usage/operación, respuesta tardía o soporte del proveedor). No se promete cancelar llamadas ya aceptadas. No se inventan capacidades de consulta de uso ni reconciliación que el proveedor no ofrezca.
 
@@ -1626,7 +1639,8 @@ Cada `BotInstance` actual se migra a `AgentInstance`:
 
 - Backup completo de MongoDB (crm + ai_service) antes de iniciar la migración.
 - Backup de vectores Qdrant y buckets MinIO afectados.
-- Plan de rollback: si falla la migración, restaurar desde backup y mantener el modelo Bot/BotInstance operativo.
+- El backup es un punto de recuperación y evidencia; no autoriza por sí solo restaurar una copia anterior sobre datos que ya recibieron asignaciones o transiciones confirmadas.
+- Antes de activar asignaciones de AgentInstance, puede recuperarse el modelo Bot/BotInstance si se verifican las condiciones previas de H.11. Después de la activación, cualquier rollback debe cumplir las condiciones e invariantes de H.11; si la restauración implica pérdida de asignaciones, historial o cambios concurrentes, se detiene y se corrige hacia adelante.
 - Migración por workspace (por lotes) para reducir riesgo y permitir validación incremental.
 
 ### H.11 Migración del modelo unificado de Contacto (WAB-78 — orden aprobado)
@@ -1648,11 +1662,15 @@ Cada `BotInstance` actual se migra a `AgentInstance`:
 
 **Nota:** El usuario confirmó que no hubo asignaciones productivas anteriores de bots (solo una prueba posteriormente eliminada). No ejecutar la migración en esta fase.
 
-**Rollback:**
-- Antes de activar asignaciones de AgentInstance: revertir el despliegue del código nuevo (los campos `assignedType`/`ref_agent_assigned` son nuevos; su eliminación no afecta `ref_user_assigned` existente).
-- Después de habilitar asignaciones de AgentInstance: un rollback no puede volver simplemente a código que solo entiende `ref_user_assigned`. Se requiere un plan de reversión que mantenga consistencia de los contactos ya asignados a agente (ventana y criterios de rollback pendientes de detalle operativo).
+**Condiciones e invariantes de rollback:**
 
-**Detalles operativos pendientes:** ventana de ejecución del backfill y criterios de rollback.
+- **Antes de activar asignaciones de AgentInstance:** el rollback del código nuevo solo puede ejecutarse tras verificar que no existen contactos asignados a agentes ni ejecuciones/trabajos pendientes que dependan del nuevo modelo. Se preserva íntegramente `ref_user_assigned`; los campos nuevos solo pueden retirarse si ningún consumidor desplegado los necesita.
+- **Después de activar asignaciones de AgentInstance:** no se permite volver a una versión que solo entienda `ref_user_assigned`. El destino del rollback debe seguir interpretando ambos tipos de asignación o existir una conversión explícita, validada y sin pérdida para cada contacto afectado. No se permite convertir silenciosamente asignaciones `agent` en `human` o `unassigned`, ni descartar referencias a AgentInstance.
+- **Cambios concurrentes durante la migración o reversión:** las nuevas transiciones de asignación deben quedar serializadas/bloqueadas durante la ventana crítica o registrarse de forma que puedan reconciliarse idempotentemente. El snapshot inicial no puede sobrescribir cambios legítimos ocurridos después de su captura.
+- **Integridad y verificación:** antes de continuar se comparan los registros y conteos por tipo de asignación, se validan ownership Contacto–Workspace–AgentInstance, ausencia de referencias huérfanas y conservación del historial `EvAssigned`. La verificación debe cubrir también ejecuciones y trabajos pendientes vinculados a la asignación.
+- **Condición de parada:** si no puede garantizarse la representación íntegra de todas las asignaciones, la conservación del historial o la reconciliación de cambios concurrentes, se detiene el rollback. Se mantiene una versión compatible y se corrige hacia adelante; no se restaura una copia antigua de datos que pueda perder asignaciones o transiciones confirmadas.
+
+**Detalles operativos pendientes para WAB-79:** ventana exacta, mecanismo de serialización/reconciliación, procedimiento de ejecución y criterios cuantitativos de aceptación. No ejecutar la migración ni el rollback en WAB-78.
 
 ---
 
@@ -1720,7 +1738,7 @@ El trabajo se agrupa por responsabilidad arquitectónica (datos, provisioning, r
 - Las operaciones `deduct`, `refund`, `purchase` y los ajustes que modifican el saldo se realizan con controles atómicos en MongoDB. `CreditLedger` y `OrganizationAICredit` residen en el mismo deployment para que la transacción abarque ambas escrituras.
 - La política de facturación híbrida, los casos de absorción por Waby, las respuestas parciales y la reconciliación se definen en G.4.6. P4 cubre exclusivamente consumo LLM; Skills HTTP y operaciones no-LLM quedan fuera.
 - El período de gracia para operaciones en `reconciliation_required` es de **30 días naturales** desde la entrada en ese estado. Al vencimiento sin evidencia suficiente se excluye el consumo desconocido y se libera su capacidad; no hay débito retroactivo automático.
-- Los retries/fallbacks de una misma ejecución conservan `executionId` y usan un `invocationId` distinto por llamada real al proveedor. Una ejecución de negocio independiente utiliza un nuevo `executionId`.
+- Los reintentos técnicos contra el mismo proveedor/modelo conservan `executionId` y usan un `invocationId` distinto por llamada real al proveedor. No se habilita fallback ni rotación entre proveedores. Una ejecución de negocio independiente utiliza un nuevo `executionId`.
 
 
 ---
@@ -1772,7 +1790,7 @@ El trabajo se agrupa por responsabilidad arquitectónica (datos, provisioning, r
 
 **Estado:** Reemplazado por DEC-CM-04, DEC-CM-06 y DEC-CM-08 (06/11/2026).
 
-**Decisión vigente:** no existe routing persistente canal → instancia ni entidad AgentRouting. CRM es autoridad única de ContactAssignment. Ante un nuevo mensaje sin asignación activa, CRM asigna la AgentInstance predeterminada solo si está activa; si no existe o no está activa, el contacto queda sin asignación. Como máximo una AgentInstance puede ser default por Workspace, con cambio atómico. No hay fallback a otra instancia por prioridad.
+**Decisión vigente:** no existe routing persistente canal → instancia ni entidad AgentRouting. CRM es autoridad única de ContactAssignment. Ante un nuevo mensaje de un contacto sin asignación humana ni asignación a una AgentInstance, CRM asigna la AgentInstance predeterminada solo si está activa; si no existe o no está activa, el contacto queda sin asignación. Como máximo una AgentInstance puede ser default por Workspace, con cambio atómico. No hay fallback a otra instancia por prioridad.
 
 **Consecuencias:** retirar `channelAssignment` y `priority` como mecanismos de resolución. El canal sigue disponible como contexto del mensaje y de Execution. Los workers validan la asignación vigente antes de cualquier efecto externo.
 
@@ -1780,23 +1798,22 @@ El trabajo se agrupa por responsabilidad arquitectónica (datos, provisioning, r
 
 ### ADR-005: Instantánea inmutable de configuración efectiva por ejecución (P10)
 
-**Estado:** Principio aprobado; versionado/retención de Knowledge y detalles de persistencia pendientes.
+**Estado:** Principio y referencias identificables/versionadas obligatorias por ejecución aprobados; política de publicación, ciclo de versionado/retención de Knowledge y detalles de persistencia pendientes.
 **Fecha de decisión:** 03/11/2026
 **Decisión:** Al comenzar cada ejecución, se crea una instantánea inmutable de la configuración efectiva (AgentDefinition versión activa, Rules, Skills, capabilities, knowledgeBaseIds y parámetros de ejecución de la AgentInstance). La ejecución en curso conserva sus definiciones hasta finalizar; los cambios posteriores se aplican únicamente a nuevas ejecuciones.
 
 Se definen **tres niveles de garantía** para trazabilidad y reproducibilidad:
 
 **Nivel 1 — Reconstrucción de configuración:**
-Permite conocer la configuración efectiva con la que se inició una ejecución. Incluye AgentDefinition, Rules, Skills, capabilities, routing, provider/model y parámetros efectivos. Se registra en `effectiveConfigHash` y (opcionalmente) en `effectiveConfigSnapshot`.
+Permite conocer la configuración efectiva con la que se inició una ejecución. Incluye referencias identificables y versionadas de AgentDefinition, Rules, Skills y SkillConfiguration, capabilities, routing, provider/model y parámetros efectivos. Se conserva obligatoriamente en `effectiveConfigSnapshot`; `effectiveConfigHash` permite verificar su integridad.
 
 **Nivel 2 — Trazabilidad del contexto:**
-Permite conocer qué información se utilizó durante la ejecución:
+Permite conocer qué información se utilizó durante la ejecución y es obligatorio por ejecución:
 - Knowledge Bases habilitadas (`knowledgeBaseIds` en el snapshot).
-- Fuentes recuperadas (IDs de documentos/chunks de Qdrant).
-- Versiones de documentos o chunks cuando existan.
-- IDs de fragmentos incorporados al contexto.
-- Hashes de contenido de fragmentos para detectar cambios entre ejecuciones.
+- Fuentes recuperadas (IDs estables de documentos/chunks de Qdrant) y su versión publicada cuando exista.
+- IDs de fragmentos efectivamente incorporados al contexto, con versión/revisión disponible y hash de contenido.
 - Referencias para recuperar el contenido original, cuando esté disponible y no haya sido eliminado por políticas de retención.
+- Si una fuente o fragmento no dispone de versionado propio, conservar su ID estable y el hash del contenido utilizado.
 
 **Nivel 3 — Reproducción de ejecución:**
 Permite intentar volver a ejecutar el proceso reconstruyendo el mismo contexto y condiciones. **Nota:** No se garantiza reproducibilidad exacta de la respuesta LLM, ya que los modelos de lenguaje son no deterministas, los proveedores pueden cambiar sus modelos, y las herramientas externas pueden devolver resultados diferentes. El Nivel 3 busca reproducir las *condiciones de entrada*, no la *salida exacta*.
@@ -1810,11 +1827,11 @@ Permite intentar volver a ejecutar el proceso reconstruyendo el mismo contexto y
 - Se definen dos hashes diferenciados:
   - `promptSnapshotHash` (SHA-256 del prompt efectivo construido) — identifica el prompt enviado al modelo.
   - `effectiveConfigHash` (SHA-256 de la configuración efectiva completa: AgentDefinition.id+version, skill IDs+versiones, rule IDs+versiones, capability IDs, provider, modelo, parámetros) — identifica la configuración efectiva.
-- Se almacena `effectiveConfigSnapshot` (JSON con valores efectivos, sin secretos) para reproducibilidad técnica (Nivel 3, P7). Si no es viable por almacenamiento, se degrada a trazabilidad suficiente (IDs + versiones, Nivel 1) y se documenta explícitamente.
-- Las ejecuciones en curso no se ven afectadas por cambios de AgentDefinition, Rules o Skills mientras están en proceso.
-- Requiere almacenar la versión de AgentDefinition, revisiones de Skills/Rules por ejecución para trazabilidad técnica (P7).
+- Se almacena obligatoriamente `effectiveConfigSnapshot` (JSON sin secretos) con las referencias identificables/versionadas de configuración y Knowledge requeridas en los Niveles 1 y 2. La copia adicional de valores efectivos para reproducibilidad técnica (Nivel 3, P7) puede optimizarse por almacenamiento, sin eliminar las referencias obligatorias.
+- Las ejecuciones en curso no se ven afectadas por cambios de AgentDefinition, Rules, Skills o Knowledge mientras están en proceso.
+- Requiere almacenar por ejecución la versión de AgentDefinition, revisiones de Skills/SkillConfiguration y Rules, y las referencias versionadas de documentos y fragmentos Knowledge efectivamente utilizados.
 - Sin flujo draft/release para el cliente (I17).
-- **Trazabilidad RAG (Nivel 2):** `knowledgeBaseIds` identifica las bases habilitadas (configuración), pero no el contenido efectivamente recuperado. Para auditoría, se registran opcionalmente IDs de fragmentos recuperados de Qdrant, versiones de documentos/chunks y hashes de fragmentos utilizados.
+- **Trazabilidad RAG (Nivel 2):** `knowledgeBaseIds` identifica las bases habilitadas, pero no el contenido efectivamente recuperado. Se registran obligatoriamente IDs de documentos y fragmentos de Qdrant, versiones disponibles y hashes de los fragmentos incorporados al contexto.
 - **No se incluyen secretos ni valores sensibles en el snapshot.** Las credenciales se referencian por ID de versión.
 - **Limitación importante:** Un hash o snapshot de configuración **no permite reconstruir exactamente una respuesta LLM**. La no determinismo de los modelos, cambios en proveedores, y datos operativos que cambian impiden la reproducción exacta de la salida. El snapshot garantiza trazabilidad de la configuración de entrada, no reproducibilidad de la salida.
 
@@ -1950,10 +1967,11 @@ Campos conceptuales:
 | `workspaceId` | Dimensión de atribución; nunca propietario de la bolsa. |
 | `agentInstanceId` | Instancia que originó el consumo, si aplica. |
 | `executionId` | Ejecución asociada a un débito, si aplica. |
-| `type` | Tipo de movimiento: `purchase`, `deduct`, `refund` y, si el producto lo soporta, `adjustment`. |
+| `type` | Tipo de movimiento: `purchase`, `deduct`, `refund` y `adjustment`. |
 | `amount` | Importe del asiento. |
 | `refundRequestId` | Identidad idempotente propia de una solicitud de devolución. |
-| `originalMovementId` | Referencia al asiento original compensado por un refund. |
+| `originalMovementId` | Referencia directa al `movementId` del débito original compensado por un refund. |
+| `originalExecutionId` | Referencia complementaria al `executionId` asociado al débito original. |
 | `idempotencyKey` | Identidad estable de la operación, distinta del fencing token. |
 | `pricingVersion` | Versión de tarifas aplicada, cuando corresponda. |
 | `metadata` | Metadatos auditables no secretos. |
@@ -2006,7 +2024,7 @@ Restricciones:
 
 ### 3.4 `ExecutionBudgetAllocation`
 
-Una asignación representa el presupuesto máximo para una invocación concreta: llamada LLM, herramienta facturable, fallback u otra operación que pueda consumir créditos.
+Una asignación representa el presupuesto máximo para una invocación concreta: llamada LLM, herramienta facturable u otra operación que pueda consumir créditos. No presupone fallback entre proveedores LLM.
 
 | Campo | Tipo conceptual | Propósito |
 |---|---|---|
