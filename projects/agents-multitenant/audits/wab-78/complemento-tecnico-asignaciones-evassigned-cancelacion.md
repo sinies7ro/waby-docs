@@ -1,3 +1,7 @@
+> **Aclaración de inventario — 07/11/2026:** contactAssignmentHistory se conserva como compatibilidad histórica si existe en datos/modelos de origen; los informes de auditoría no encontraron una implementación actual con ese nombre. No inferir que exista una colección/campo desplegado. EvAssigned en CRM es el contrato canónico para el historial funcional de nuevas transiciones.
+
+---
+
 # WAB-78 — Complemento Técnico: Asignaciones Unificadas, EvAssigned y Cancelación de Ejecuciones
 
 **Estado:** Material técnico de apoyo de WAB-78; no es una segunda fuente normativa. Sin implementación.

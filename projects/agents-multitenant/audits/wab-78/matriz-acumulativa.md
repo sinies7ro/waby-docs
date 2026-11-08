@@ -1,6 +1,6 @@
 # WAB-78 — Matriz acumulativa de hallazgos (ARQ)
 
-**Actualizada:** 06/11/2026 — sincronización del contrato base ARQ-21 (Opción C / RS256).
+**Actualizada:** 07/11/2026 — reconciliación de estados posterior a las decisiones aprobadas y consolidación documental.
 **Formato:** plan de revisión §8 (columnas obligatorias) + columna `Origen` para distinguir procedencia.
 **Reglas:** identificadores globales estables; no renumerar; no duplicar (referenciar y actualizar evaluación si hay evidencia nueva). ARQ-01 y ARQ-02 no localizados → **IDs reservados**.
 
@@ -61,16 +61,16 @@
 
 ## 5. Estado de bloques de revisión
 
-| Bloque | Alcance | Estado (04/11/2026) | Hallazgos |
+| Bloque | Alcance | Estado reconciliado (07/11/2026) | Hallazgos |
 |---|---|---|---|
-| **1 — D1** Dominio y ownership | Entidades, cardinalidades, integridad, ownership CRM/ai-service | **Revisado** (sesión individual 1) | ARQ-11 … ARQ-18 (nuevos); ARQ-03 y ARQ-07 con evidencia/observación adicional |
-| **2 — D2** Provisioning y permisos | Matriz de actores/permisos, ResourceOwnership, H1/H4/H5/H7 | **Revisado** (sesión individual 2) | ARQ-19, ARQ-20, ARQ-21 (nuevos); ARQ-03 validado (Crítico/Sí); ARQ-04 validado parcialmente (Medio/No) |
-| 3 — D3 Routing y asignaciones | Recepción, EvAssigned, Outbox, ABA, concurrencia, G3/G4 | **Revisado** (diagnóstico completado; reconciliación posterior con evidencia adicional) | ARQ-05 (Ausencia de implementación verificada — Bloquea), ARQ-06 (Ausencia de transacción verificada, recuperación compensatoria — Bloquea), ARQ-07 (Ausencia parcial verificada, invalidación de efectos tardíos incompleta — Bloquea), ARQ-08 (Ausencia verificada, validación contra proyección no CRM — Bloquea), ARQ-09 (Propuesta pendiente, no aprobada — No bloquea), ARQ-22 (Alto / bloqueante — Brecha de confiabilidad verificada en código; impacto productivo no reproducido — Bloquea) |
-| 4 — D4+D5 Runtime, seguridad y contexto | Contexto, políticas, Knowledge, memoria, snapshot | **D5-A/B/C: diagnósticos completados y reconciliación aprobada (06/11/2026); D4: pendiente de cierre** | ARQ-10 (alcance aprobado); grounding, dominio, contexto y memoria con contratos independientes |
-| 5 — D6 Proveedores LLM y créditos | P4 completo, proveedores, atribución | **No iniciado** | — |
-| 6 — D7 Operación, persistencia y migración | Atlas, Outbox, Rabbit, delete-wrk, backfill | **No iniciado** | Relacionados: ARQ-06 |
-| **Integración** — 15 escenarios | Interacciones entre dominios | **No iniciado** | — |
-| **Veredicto final** (GO / GO condicionado / NO-GO) | §9 del plan | **No emitido** (solo al cierre de bloques + integración) | — |
+| **1 — D1** Dominio y ownership | Entidades, cardinalidades, integridad, ownership CRM/ai-service | **Diagnóstico completado; ARQ-14 y ARQ-18 reconciliados en D.1.9/A.2/B** | ARQ-11…ARQ-18 conservan procedencia histórica; estados vigentes en §8 |
+| **2 — D2** Provisioning y permisos | Matriz de actores/permisos, ResourceOwnership, H1/H4/H5/H7 | **Diagnóstico completado; ARQ-19/20/21 reconciliados con decisiones aprobadas** | La implementación y el endurecimiento operativo se difieren según §8 |
+| 3 — D3 Routing y asignaciones | Recepción, EvAssigned, Outbox, ABA, concurrencia, G3/G4 | **Diagnóstico completado; contratos ARQ-05/06/07/08 reconciliados; ARQ-22 especificado en D.6** | ARQ-09 continúa propuesta no aprobada; implementación y verificación Atlas diferidas. Evidencia histórica de brechas en §4/§8 |
+| 4 — D4+D5 Runtime, seguridad y contexto | Contexto, políticas, Knowledge, memoria, snapshot | **Diagnósticos D4-A/D4-B y D5-A/B/C completados; estados reconciliados** | ARQ-10 y contratos D5-C definidos; implementación diferida |
+| 5 — D6 Proveedores LLM y créditos | P4 completo, proveedores, atribución | **P4 aprobada e integrada; verificación operativa/Atlas no equivale a decisión pendiente** | Implementación y pruebas financieras/concurrencia en fases técnicas |
+| 6 — D7 Operación, persistencia y migración | Atlas, Outbox, Rabbit, delete-wrk, backfill | **Implementación/verificación diferida; no bloquea por sí sola el contrato de Fase 2** | Atlas ARQ-06 y mensajería ARQ-22 se verifican/implementan en fases técnicas |
+| **Integración** — 15 escenarios | Interacciones entre dominios | **Cruce documental completado en §8; pruebas de integración no ejecutadas** | La cobertura contractual se mapea; la ejecución de pruebas queda para fases técnicas |
+| **Veredicto final** (GO / GO condicionado / NO-GO) | §9 del plan | **No emitido: requiere revisión y autorización expresa del usuario** | No implica cierre automático de WAB-78 |
 
 ---
 
@@ -79,8 +79,8 @@
 1. **No duplicar:** si un hallazgo previo gana evidencia, actualizar su fila (como ARQ-03/ARQ-04 en la sesión D2, ARQ-03/ARQ-07 en D1) en lugar de crear un ID nuevo.
 2. **Secuencia nueva:** el siguiente ID disponible es **ARQ-23** (ARQ-22 consumido por el nuevo hallazgo de entrega e idempotencia asíncrona).
 3. **Preliminares:** ARQ-03 y ARQ-04 **validados en D2**; ARQ-05 … ARQ-09 **verificados en D3** (conservar procedencia). ARQ-10 sigue pendiente en D4; conservar siempre su procedencia hasta entonces.
-4. **Bloqueantes vigentes:** de D1 → ARQ-13 y ARQ-14; de D2 → ARQ-03, ARQ-19, ARQ-20, ARQ-21; de D3 → ARQ-05, ARQ-06, ARQ-07, ARQ-08, ARQ-22. El resto son inconsistencias documentales o pendientes diferidos, que funcionan como condiciones de actualización, no como bloqueo del veredicto.
-5. **No reabrir** P1/P2/P4/P9/P10: ARQ-11/ARQ-12/ARQ-16/ARQ-17 piden **actualizar documentos** a decisiones ya aprobadas; ARQ-13 registra pendientes ya abiertos en el registro §4.1; ARQ-19 registra la decisión P3 (registro §6) sin reabrirla.
+4. **Bloqueantes vigentes (lista histórica, sustituida por §8):** la clasificación de D1–D3 queda superada por la reconciliación del 07/11/2026. Consultar §8 para el estado vigente; no usar esta lista como bloqueantes activos.
+5. **Nota histórica (06/11):** esta clasificación queda superada por §8 (07/11/2026). No utilizar la referencia antigua a pendientes de ARQ-13 como estado vigente.
 6. Los artefactos de esta carpeta son **trabajo de revisión**, no documentos canónicos; no editar el canónico ni el registro de decisiones durante el diagnóstico (plan §7).
 7. **Correcciones de D2 con evidencia (sin reabrir AUD):** (a) AUD-02 clasificó `wrk*` como "ámbito workspace", pero `wrkCreate/Read/Update/Delete` valen `org.workspaces.*` (`permission.enum.ts` L19-23) y los `org.workspaces.*` de escritura **sí** validan membership vía WrkGuard; (b) AUD §11.2 y `permisos-roles.md` H2 afirman `wrk.media.*` sin resolver, pero `Media.resolver.ts` L14 exige `wrk.media.read`. Ambas se registran como corrección de alcance en `informe-bloque-2.md` §3.7, no como nueva fila ARQ.
 
@@ -95,6 +95,49 @@
 4. **Aislamiento y workspaceId:** no crear un ARQ nuevo. Reconciliar ownership/autorización con ARQ-03 y ARQ-20, e identidad de servicio/contexto portado con ARQ-21. Cotejar la cobertura exacta al formalizar esos contratos. ARQ-05/07/08 solo se reutilizan para sus garantías específicas de asignación/ejecución. **ARQ-22 queda excluido** porque trata entrega durable e idempotencia RabbitMQ, no aislamiento ni validación de workspaceId.
 5. **Logs y telemetría:** no agregar requisito de infraestructura de observabilidad/telemetría a WAB-78, dado que la infraestructura actual está prevista para retiro. No diseñar redacción/retención para un sistema que no se mantendrá. Cualquier auditoría de negocio/seguridad necesaria se trata separadamente; si subsisten registros operativos, no deben exponer secretos ni datos de otros tenants.
 6. **ARQ-19/20/21:** ARQ-19 queda resuelto en cuanto a la distribución de responsabilidades: Waby administra la plataforma y los usuarios autorizados del Workspace administran integralmente sus AgentInstances (Knowledge, Skills, Rules, integraciones, estado y eliminación lógica). La purga física permanece en Waby. ARQ-20 debe traducir esta matriz a permisos concretos; ARQ-21 debe formalizar identidad de servicio y contexto tenant/recurso. Las decisiones principales de los tres ARQ no se reabren.
-7. **Bloqueantes:** se conserva la lista de 11 bloqueantes de la matriz. La aprobación conceptual de estos asuntos no cierra por sí sola los contratos pendientes ni modifica el veredicto de WAB-78.
+7. **Bloqueantes (estado histórico al 06/11):** la lista de 11 bloqueantes queda sustituida por la reconciliación de estados incorporada en §8 (07/11/2026). No utilizar esta lista histórica como estado vigente.
 
 **Procedencia:** reconciliación D5-A (comentario Linear b2855949-3241-48ea-87a0-8c98a223018b), D5-B (informe informe-bloque-5b.md y comentario 5b8872bf-5f8f-4da3-87ab-0ddc78cc62ea), D5-C (comentario 5f38da16-9aa2-41da-90e8-5ae2b9d6e452), aprobación conceptual D5/CTX-P3/P4 (f2a6e472-2b0a-4804-93ec-2ead023ac2c5) y decisiones ARQ-19/20/21 (74a9b6c6-fb63-436e-bf2a-16289df62373).
+---
+
+## 8. Reconciliación final de estados — 07/11/2026
+
+Esta sección actualiza la clasificación operativa de los hallazgos a la luz de decisiones posteriores aprobadas y del diseño integral ya publicado. No reescribe la evidencia histórica de D1–D5 ni convierte ausencia de implementación en una nueva decisión de producto.
+
+| Hallazgo | Estado reconciliado | Tratamiento y destino |
+|---|---|---|
+| ARQ-03 | **Resuelto como contrato de diseño** | Actores, responsabilidades, permisos y autenticación base quedan cubiertos por ARQ-19/20/21. La ausencia de entidades/permisos en el código es implementación de WAB-79/WAB-80, no bloqueo de diseño. |
+| ARQ-11, ARQ-12, ARQ-16, ARQ-17 | **Inconsistencias históricas; reconciliadas en el diseño vigente** | P1/P9 y los estados de ADRs fueron actualizados en el documento integral. Conservar las filas como trazabilidad, no como bloqueantes activos. |
+| ARQ-18 | **Resuelto en A.2/B** | A.2 y B incorporan Contacto/ContactAssignment, EvAssigned y Outbox de asignación. contactAssignmentHistory queda identificado como compatibilidad histórica a conservar si existe, sin afirmar que esté implementado ni convertirlo en fuente de verdad frente a EvAssigned. |
+| ARQ-13 | **Resuelto por DEC-CM-06/08** | Un Workspace puede tener cero o una instancia predeterminada; nunca más de una. El cambio es atómico y no migra asignaciones existentes. Se elimina la premisa antigua de que todo Workspace debe tener siempre una predeterminada. Los índices/pruebas corresponden a WAB-79. |
+| ARQ-14 | **Resuelto como contrato de diseño en D.1.9/B** | Se separan propietario de negocio, API y persistencia por entidad: AgentDefinition/Knowledge/ConversationMemory/AgentExecution en AI Service DB; AgentInstance/Skills/Rules/créditos/asignaciones en CRM DB; vectores en Qdrant y binarios en MinIO. AI Service conserva contact_assignments solo como proyección. Índices y esquemas físicos se difieren a WAB-79/WAB-81. |
+| ARQ-15 | **Diferido a WAB-79** | Índices concretos y restricciones físicas pertenecen al modelo persistente de Fase 3, respetando los contratos aprobados. No bloquea el diseño conceptual. |
+| ARQ-19 | **Resuelto** | Modelo híbrido por operación aprobado y reflejado en el diseño. |
+| ARQ-20 | **Contrato cerrado; implementación diferida a WAB-80** | wrk.agents.* y wrk.agents.read, actores y límites están definidos. |
+| ARQ-21 | **Contrato base cerrado; endurecimiento operativo diferido** | RS256, identidades diferenciadas por dirección, token por petición, claims base y validaciones están definidos. Inventario exhaustivo de scopes/claims, rotación, revocación, anti-replay, RabbitMQ y pruebas negativas se ejecutan en WAB-80/WAB-81; el despliegue sigue No verificado hasta evidencia. |
+| ARQ-05 | **Contrato de diseño resuelto** | EvAssigned como discriminator en Evento, identidad de transición y resolución ABA están especificados en D.1.6/D.1.7. La implementación corresponde a fases posteriores. |
+| ARQ-06 | **Requisito y solución preferida definidos; verificación técnica diferida** | La transición Contacto + EvAssigned + Outbox debe ser atómica; la transacción MongoDB es la solución preferida. Verificar soporte Atlas y materializar la solución en la fase de persistencia. Si no es viable, la alternativa recuperable requiere diseño específico antes de implementarse. |
+| ARQ-07 / ARQ-08 | **Contratos objetivo definidos; implementación diferida a WAB-81** | La vigencia debe validarse contra CRM, fail-closed ante imposibilidad de comprobarla e invalidar efectos tardíos. Abort físico del proveedor no se eleva a garantía absoluta si el proveedor no lo soporta; la protección efectiva es no publicar ni ejecutar efectos obsoletos. |
+| ARQ-10 y D5-A/B/C | **Diagnóstico y reconciliación aprobados** | Policy Engine/Output Filter y los dos contratos D5-C permanecen como obligaciones de diseño; implementación posterior. Los 33 subcontratos no son 33 subsistemas ni bloqueantes independientes. |
+| ARQ-22 | **Resuelto como contrato de diseño en D.6; implementación diferida a WAB-81** | Se define entrega at-least-once con Outbox en ambos tramos, confirmación de broker, inbox/aceptación durable antes del ack, originMessageId estable, un executionId por mensaje lógico, deduplicación de resultados, recuperación, reintentos y DLQ. No se promete exactly-once ni se afirma impacto productivo reproducido. |
+
+**Cruce documental de los 15 escenarios D3 (no equivale a pruebas ejecutadas):**
+
+| Escenarios D3 | Contrato canónico de cobertura |
+|---|---|
+| 1–2: recepción con/sin instancia predeterminada | E.2 y E.4.1–E.4.2; precedencia DEC-CM-06/08 |
+| 3–4: concurrencia de asignación y doble asignación | E.4.10, D.1.8 y D.1.9 |
+| 5–7: reasignación/takeover durante o después de LLM | E.4.11 y E.4.12; invalidación obligatoria y cancelación física best-effort |
+| 8: resultado antiguo tras cambio de asignación | E.4.12; validación contra CRM antes del efecto |
+| 9: ABA A→B→A | D.1.6–D.1.7 y E.4.12; identidad EvAssigned |
+| 10: indisponibilidad durante validación | E.2, G1/G2/G3/G4 y regla fail-closed |
+| 11: atomicidad Contacto + EvAssigned + Outbox | D.1.8; solución preferida transaccional, Atlas sin verificar |
+| 12–13: redelivery, rechazo y recuperación de mensajes | D.6.3–D.6.7; Outbox/inbox, ack manual, retry y DLQ |
+| 14: ciclos de transferencia | E.4.9; regla funcional definida, auditoría del mecanismo/eventos existente diferida |
+| 15: reintento del mismo mensaje de origen | D.6.2–D.6.4; originMessageId estable y deduplicación persistente |
+
+La cobertura anterior confirma que los escenarios están contemplados en el diseño, no que las pruebas automatizadas o de integración se hayan ejecutado. Las decisiones aprobadas se mantienen; los mecanismos físicos se implementan en WAB-79/WAB-80/WAB-81 según su responsabilidad.
+
+**Estado de bloques:** D1–D5 cuentan con diagnósticos y reconciliación de decisiones; D4-A/D4-B conservan sus observaciones como evidencia histórica. ARQ-14 y ARQ-22 tienen contrato de diseño en D.1.9/B y D.6. D6 no debe figurar como “No iniciado” respecto de P4: está aprobada e integrada. La verificación de Atlas y la implementación de persistencia/mensajería siguen siendo trabajo técnico futuro. La cobertura de los 15 escenarios está cruzada en la tabla precedente; las pruebas no se consideran ejecutadas por esta revisión.
+
+**Veredicto de esta reconciliación:** ARQ-14 y ARQ-22 dejan de ser bloqueantes de diseño por los contratos D.1.9/B y D.6. La verificación cruzada documental de inventario, diagramas, contratos, ADRs y 15 escenarios D3 quedó completada el 07/11/2026; no equivale a pruebas de integración ejecutadas. El diseño queda listo para revisión y autorización expresa del usuario. No se emite GO ni se declara WAB-78 cerrada hasta esa autorización. La implementación y las verificaciones de infraestructura permanecen diferidas a sus fases técnicas.

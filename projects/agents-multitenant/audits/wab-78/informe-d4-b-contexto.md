@@ -1,3 +1,7 @@
+> **Nota de vigencia — 07/11/2026:** este informe conserva su evidencia de auditoría D4-B. La propiedad de persistencia que allí se señalaba como pendiente queda resuelta en D.1.9 del diseño canónico: WorkspaceKnowledge/documentos persisten en AI Service DB, con CRM como fachada autorizadora, Qdrant como índice derivado y MinIO para binarios. Los contratos de configuración/snapshot aprobados prevalecen sobre recomendaciones o estados históricos del informe. Esta nota no afirma implementación.
+
+---
+
 # WAB-78 — Informe D4-B: Auditoría de Construcción del Contexto
 
 **Fecha:** 05/11/2026 · **Bloque:** D4-B (Construcción del contexto) · **Modo:** Solo lectura y diagnóstico

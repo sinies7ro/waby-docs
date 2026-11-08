@@ -1,3 +1,7 @@
+> **Nota de vigencia — 07/11/2026:** este informe conserva la evidencia histórica D2. ARQ-19/20/21 y las decisiones DEC-CM-01..08 permanecen aprobadas. ARQ-14 queda resuelto como contrato de diseño en D.1.9/B; el endurecimiento operativo de ARQ-21 se difiere a WAB-80/WAB-81. Las antiguas listas de bloqueantes se leen como procedencia y no como estado vigente. No se afirma implementación.
+
+---
+
 # WAB-78 — Informe del Bloque 2: Provisioning y permisos (D2)
 
 **Fecha:** 04/11/2026 · **Alcance:** diagnóstico exclusivo del dominio D2 (plan de revisión §4, Bloque 2).

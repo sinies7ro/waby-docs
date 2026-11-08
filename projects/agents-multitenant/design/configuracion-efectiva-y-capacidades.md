@@ -1,3 +1,7 @@
+> **Estado reconciliado — 07/11/2026:** ARQ-14 está resuelto en D.1.9/B del diseño canónico. ARQ-19/20/21 mantienen sus decisiones aprobadas; el endurecimiento operativo de ARQ-21 se difiere a WAB-80/WAB-81. Este documento conserva su alcance de configuración efectiva/capabilities y no sustituye la matriz de persistencia ni el contrato de mensajería D.6.
+
+---
+
 # Configuración efectiva y capacidades de AgentInstance — propuesta CTX-P3 / CTX-P4
 
 **Estado:** CTX-P3/CTX-P4 aprobados como dirección y contrato conceptual. ARQ-19 (modelo híbrido por operación) y ARQ-20 (contrato `wrk.agents.*` / `wrk.agents.read`) están resueltos documentalmente. ARQ-21 tiene aprobada la Opción C y el contrato base de JWT de servicio RS256; el inventario exhaustivo de operaciones, scopes, rotación, verificación integral de flujos y evidencia de despliegue siguen pendientes.  
@@ -138,9 +142,9 @@ La siguiente matriz define responsabilidades de producto; **no aprueba nombres d
 - Los permisos delegables al Workspace deben encajar en el modelo existente `org.*` / `wrk.*`, con validación de membresía y ownership; el alcance real debe probarse para evitar escalada mediante `org.*.*`.
 - Las operaciones exclusivas de plataforma requieren un actor/identidad de Waby que el sistema actual todavía no representa. No se debe simular ese actor usando un usuario cliente ni un token compartido sin tenant.
 - El runtime de una AgentInstance no hereda roles humanos. La identidad técnica debe recibir únicamente el contexto y las operaciones necesarias para esa ejecución.
-- La matriz acumulativa conserva ARQ-03 y ARQ-13/ARQ-14 como bloqueos preexistentes. ARQ-19 está resuelto y ARQ-20 tiene su contrato documental cerrado; ARQ-21 tiene seleccionada la Opción C/RS256, con especificación operativa pendiente en WAB-78.
+- La matriz acumulativa conserva la procedencia de ARQ-03 y ARQ-13/ARQ-14; ARQ-14 queda resuelto en D.1.9/B. ARQ-19/20/21 mantienen sus decisiones aprobadas; el detalle operativo de ARQ-21 se difiere a WAB-80/WAB-81.
 
-Los permisos de administración y lectura ya están definidos por ARQ-20; su incorporación al enum, asignación a roles y verificación de guards/ownership corresponden a WAB-80. La identidad de servicio base está seleccionada por ARQ-21 (JWT RS256); su inventario de operaciones, scopes, claims por flujo, rotación y pruebas deben completarse en WAB-78 antes de su implementación en WAB-80/WAB-81. Cada ejecución debe portar y validar el contexto aplicable (`orgId`, `workspaceId` y `agentInstanceId` cuando corresponda), comprobando la relación AgentInstance → Workspace → Organización antes de leer datos o ejecutar operaciones. No se crea un segundo sistema de permisos en WAB-78.
+Los permisos de administración y lectura ya están definidos por ARQ-20; su incorporación al enum, asignación a roles y verificación de guards/ownership corresponden a WAB-80. La identidad de servicio base está seleccionada por ARQ-21 (JWT RS256); el inventario exhaustivo de operaciones/scopes, claims por flujo, rotación, replay y pruebas negativas es endurecimiento operativo diferido a WAB-80/WAB-81. Cada ejecución debe portar y validar el contexto aplicable (`orgId`, `workspaceId` y `agentInstanceId` cuando corresponda), comprobando la relación AgentInstance → Workspace → Organización antes de leer datos o ejecutar operaciones. No se crea un segundo sistema de permisos en WAB-78.
 
 ## 7. Experiencia simple de configuración
 

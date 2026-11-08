@@ -1,3 +1,7 @@
+> **Estado actualizado al 07/11/2026:** DEC-CM-01 a DEC-CM-08 continúan aprobadas y no se reabren. El detalle de scopes, rotación/revocación/replay y autenticación RabbitMQ de ARQ-21 es endurecimiento técnico diferido a WAB-80/WAB-81, no una decisión de producto pendiente. La implementación de persistencia, vigencia y cancelación se realiza en sus fases correspondientes. ARQ-14 queda resuelto por la matriz normativa D.1.9/B y ARQ-22 por el contrato D.6; la implementación se difiere a WAB-79/WAB-81 según corresponda. La verificación cruzada documental quedó completada el 07/11/2026; WAB-78 queda a la espera de revisión/autorización final del usuario. Este documento registra decisiones, no certifica implementación.
+
+---
+
 # Decisiones operativas de AgentInstance — DEC-CM-01 a DEC-CM-08
 
 **Estado:** decisiones conceptuales aprobadas por el usuario el 06/11/2026.  

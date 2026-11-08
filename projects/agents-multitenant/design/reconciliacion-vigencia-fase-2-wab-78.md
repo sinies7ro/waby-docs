@@ -1,3 +1,7 @@
+> **Nota de vigencia — 07/11/2026:** este registro conserva la procedencia histórica de la reconciliación del 06/11. Las instrucciones de “incorporar este registro al documento integral” y la lista genérica de pendientes de §4–5 están superadas: el diseño integral ya está consolidado y publicado. Las decisiones ARQ-19/20/21, DEC-CM-01..08, P4 y la reconciliación D5-A/B/C permanecen aprobadas. El endurecimiento operativo de ARQ-21 y la implementación de ARQ-06/07/08 se difieren a WAB-79/WAB-80/WAB-81 según corresponda. ARQ-14 queda resuelto por la matriz normativa D.1.9/B y ARQ-22 por el contrato D.6; sus implementaciones se difieren a WAB-79/WAB-81. La verificación cruzada documental quedó completada el 07/11/2026; WAB-78 queda a la espera de revisión/autorización final del usuario. Consultar §8 de ../audits/wab-78/matriz-acumulativa.md y K/L del documento integral para el estado reconciliado. WAB-78 permanece In Progress hasta autorización expresa.
+
+---
+
 # Reconciliación de vigencia del diseño — WAB-75 / WAB-78
 
 **Fecha de corte:** 06/11/2026  

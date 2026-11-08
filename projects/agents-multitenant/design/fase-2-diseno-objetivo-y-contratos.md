@@ -1,6 +1,6 @@
 # WAB-78 — Fase 2: Diseño objetivo y contratos
 
-> **Estado documental actualizado al 06/11/2026.** Este documento es el diseño integral de Fase 2 reconciliado con las decisiones aprobadas en Linear. En caso de contradicción prevalecen ARQ-19/20/21, DEC-CM-01..08 y P4 aprobada. Los acuerdos conceptuales no implican implementación. WAB-78 permanece In Progress; no cerrar la fase ni iniciar WAB-79 sin autorización expresa.
+> **Estado documental actualizado al 07/11/2026.** Este documento es el diseño integral de Fase 2 reconciliado con las decisiones aprobadas en Linear. En caso de contradicción prevalecen ARQ-19/20/21, DEC-CM-01..08 y P4 aprobada. Los acuerdos conceptuales no implican implementación. WAB-78 permanece In Progress; no cerrar la fase ni iniciar WAB-79 sin autorización expresa.
 >
 > **Cambios de vigencia:** P1 sustituye el cupo comercial antiguo y deja sin vigencia I3 en lo relativo a límites de cantidad; se retiraron las reglas antiguas de cupos 1/2 y downgrade, routing persistente canal→instancia, permisos `platform.*`/`bot.configure`/`wrk.agent.use`, y la autoridad exclusiva de Waby sobre el ciclo de vida lógico de AgentInstance. Ver el [registro de reconciliación](./reconciliacion-vigencia-fase-2-wab-78.md).
 
@@ -46,6 +46,17 @@ La auditoría de Fase 1 confirmó que `Bot` mezcla definición + instancia. No h
 - `OrganizationAICredit` / `CreditLedger` (bolsa única por Organización, I17/I20)
 
 ### A.2 Entidades, responsabilidades y cardinalidades
+
+#### Contacto y asignaciones (CRM)
+
+La asignación efectiva se mantiene en el documento Contacto de CRM mediante assignedType, ref_user_assigned y ref_agent_assigned, conforme a D.1.5. CRM es la única fuente de verdad.
+
+EvAssigned es un discriminator de Evento en la colección eventos de CRM. Cada transición confirmada tiene identidad única y el historial no se replica a ai-service. La identidad de EvAssigned identifica la transición que autorizó una ejecución y resuelve ABA; no se sustituye por originMessageId.
+
+**Compatibilidad histórica:** contactAssignmentHistory se conserva durante esta fase como artefacto/estructura legacy si está presente en los datos o modelos de origen. No se presupone su existencia en el código actual ni se lo considera fuente canónica de nuevas transiciones: ese rol corresponde a EvAssigned. No eliminarlo como parte de esta fase sin una decisión de migración explícita.
+
+**Proyección runtime:** contact_assignments en ai-service es una proyección derivada de ContactAssignment, sincronizada desde CRM. No es autoridad editable ni reemplaza la validación contra CRM en los checkpoints que exigen autoridad de dominio.
+
 
 #### AgentDefinition (Waby)
 Propiedad de la plataforma Waby. Representa la definición lógica de un agente: personalidad base, prompt del sistema, Skills/Rules por defecto, proveedor y modelo recomendados por Waby.
@@ -355,18 +366,39 @@ ORGANIZACIÓN
        │        └── ExecutionBudgetAuthorization (1:N)
        │                 └── ExecutionBudgetAllocation (1:N)
        └── CreditLedger (append-only; workspaceId es dimensión de atribución)
+
+CRM — AUTORIDAD DE ASIGNACIONES
+  Contacto / ContactAssignment
+       ├── EvAssigned (Evento discriminator; colección eventos)
+       ├── Assignment Outbox (propagación recuperable)
+       └── contactAssignmentHistory (compatibilidad legacy, si existe)
+
+CRM — MENSAJERÍA ASÍNCRONA
+  AgentMessageOutbox (CRM → AI Service)
+  ExecutionResultInbox (AI Service → CRM; deduplicación durable)
+
+AI SERVICE — MENSAJERÍA ASÍNCRONA
+  AgentExecutionInbox (recepción durable)
+       └── AgentExecution
+              └── ExecutionResultOutbox (AI Service → CRM)
 ```
 
 ### Propiedad por capa
 
-| Capa | Entidades | Propietario | Aislamiento |
-|------|-----------|-------------|-------------|
-| Waby (plataforma) | AgentDefinition | Waby | Global, no visible al cliente |
-| Workspace | AgentInstance, WorkspaceKnowledge | Workspace | Entre workspaces aislado (I7) |
-| Organización | OrganizationAICredit, CreditLedger | Organización | Entre organizaciones aislado (I7) |
-| AgentInstance | SkillConfiguration, AgentRules | AgentInstance | Entre instancias aislado (I12, I13) |
-| Conversación | ConversationMemory | AgentInstance + conversación | Máximo 20 msgs user/assistant (I14) |
-| Ejecución | AgentExecution, AgentExecutionLog | AgentInstance + Workspace | Atribución por instancia (I20, I21) |
+| Capa / dominio | Entidades | Propietario de negocio | Persistencia fuente de verdad |
+|---|---|---|---|
+| Waby (plataforma) | AgentDefinition y Prompt/PromptVersion asociados | Waby | AI Service DB, bajo control exclusivo Waby |
+| Workspace | AgentInstance | Workspace | CRM DB |
+| Workspace | WorkspaceKnowledge y metadatos de documentos | Workspace | AI Service DB; binarios en MinIO y vectores/índice derivados en Qdrant |
+| Organización | OrganizationAICredit, CreditLedger, ExecutionBudgetAuthorization, ExecutionBudgetAllocation | Organización | CRM DB |
+| AgentInstance | SkillConfiguration, AgentRules | AgentInstance | CRM DB |
+| Conversación | ConversationMemory | AgentInstance + conversación | AI Service DB |
+| Ejecución | AgentExecution, AgentExecutionLog | AgentInstance + Workspace | AI Service DB |
+| Asignaciones CRM | Contacto/ContactAssignment, EvAssigned y Outbox de asignación | CRM | CRM DB |
+| Proyección runtime | contact_assignments | Derivado de ContactAssignment CRM | AI Service DB; reconstruible desde CRM |
+| Outbox de mensaje de origen CRM → AI Service (AgentMessageOutbox) | CRM | CRM | CRM DB | Mensaje de origen e intención de despacho se escriben en una misma unidad atómica; distinto del Outbox de asignación de D.1.8. |
+| Inbox de ejecución (AgentExecutionInbox) y Outbox de resultado (ExecutionResultOutbox) | AI Service | AI Service | AI Service DB | Recepción durable/deduplicación vinculada a AgentExecution y publicación recuperable del resultado. |
+| Inbox de resultado CRM ← AI Service (ExecutionResultInbox) | CRM | CRM | CRM DB | Recibo durable idempotente por eventId/executionId; Redis puede ser caché, no autoridad de deduplicación. |
 
 ### Restricciones de integridad
 
@@ -528,18 +560,20 @@ Si una fuente o fragmento no dispone de versionado propio, se conserva su identi
 
 ### D.1 Responsabilidades del CRM y AI Service
 
+La tabla siguiente describe la superficie de gestión y las responsabilidades funcionales. La asignación inequívoca de persistencia por entidad se fija en D.1.9; no inferir persistencia a partir de quién expone el resolver o administra la operación.
+
 | Responsabilidad | CRM (Backend) | AI Service | Observaciones |
 |-----------------|---------------|------------|---------------|
 | Gestión de Workspaces y Organizaciones | ✅ | ❌ | Tenant → Workspace → Permission → Hierarchy → Operation |
 | Gestión de AgentDefinition | ❌ (solo lectura) | ✅ (Waby-only) | Crear/editar/versionar/retirar definiciones |
 | Gestión de AgentInstance | ✅ (autoridad de dominio y persistencia) | Ejecuta runtime/proyecciones derivadas | Usuarios autorizados del Workspace administran la instancia; Waby controla definición, políticas y provisioning técnico. |
-| Gestión de Knowledge (KB + documentos) | ✅ | ❌ | Alta/edición/baja de documentos, enlaces, FAQs |
+| Gestión de Knowledge (KB + documentos) | ✅ (API, autorización y fachada) | ✅ (persistencia y procesamiento) | Workspace es propietario; AI Service DB conserva la fuente de verdad de WorkspaceKnowledge/documentos; Qdrant es índice derivado y MinIO almacena binarios. |
 | Gestión de Skills/Rules por instancia | ✅ (permiso `wrk.agents.*`) | ❌ | Configuración empresarial dentro de allowlist y políticas Waby |
 | Ejecución de agente (pipeline LLM) | ❌ | ✅ | Resolver instancia, cargar contexto, invocar proveedor |
 | Asignación efectiva de Contacto (`assignedType`, `ref_user_assigned`, `ref_agent_assigned`) | ✅ (autoridad única) | ❌ (proyección operativa `contact_assignments` solo para runtime) | CRM decide quién tiene asignado el contacto. `ref_agent_assigned` es referencia tipada a `AgentInstance._id`. Sin `assignmentVersion`. |
 | Historial funcional de asignaciones (`EvAssigned`) | ✅ (exclusivo en CRM, colección `eventos`) | ❌ (no se sincroniza) | Registra transiciones confirmadas de asignación. Identidad única de EvAssigned autoriza cada ejecución (resolución ABA). |
-| Cálculo y descuento de créditos | ✅ (ledger y autoridad transaccional del saldo de Organización) | ✅ (ejecuta invocaciones y reporta usage) | CRM autoriza presupuesto y liquida; ai-service no es autoridad de saldo ni autoriza presupuesto por cuenta propia. |
-| Auditoría por ejecución | ✅ (log técnico) | ✅ (campos I21) | execution_id, agent_instance_id, workspace_id, etc. |
+| Cálculo y descuento de créditos | ✅ (persistencia y autoridad transaccional de saldo, ledger y autorizaciones) | ✅ (ejecuta invocaciones y reporta usage) | OrganizationAICredit, CreditLedger, ExecutionBudgetAuthorization y ExecutionBudgetAllocation persisten en CRM. ai-service no es autoridad de saldo ni autoriza presupuesto por cuenta propia. |
+| Auditoría por ejecución | ✅ (auditoría de negocio/financiera separada) | ✅ (fuente de verdad de AgentExecution y AgentExecutionLog) | CRM conserva CreditLedger y referencias financieras; no duplica el log operativo de ejecución. |
 | Eliminación de Workspace | ✅ (delete-wrk extendido) | ✅ (limpia ai_service) | Knowledge, vectores, media, ejecuciones |
 
 #### D.1.5 Modelo unificado de Contacto (decisión aprobada — WAB-78)
@@ -631,6 +665,37 @@ Si la transacción no resulta viable, deberá diseñarse y aprobarse una alterna
 
 `EvAssigned` nunca se envía como historial a ai-service. Si ai-service necesita conocer el identificador de la transición que autoriza una ejecución para validar ABA, puede recibir únicamente ese identificador como metadata de la proyección operativa. Eso no constituye sincronizar el historial funcional.
 
+#### D.1.9 Matriz normativa de ownership y persistencia (ARQ-14)
+
+La propiedad de negocio, la superficie de API y la persistencia son dimensiones distintas. Esta matriz fija el servicio que conserva la fuente de verdad de cada entidad del modelo objetivo. La presencia de una fachada GraphQL en CRM no implica que CRM persista la entidad; una proyección o índice derivado tampoco se convierte en fuente de verdad.
+
+| Entidad / recurso | Propietario de negocio | API / gestión | Persistencia fuente de verdad | Copias derivadas y límites |
+|---|---|---|---|---|
+| AgentDefinition, Prompt, PromptVersion asociados | Waby | Operaciones Waby-only en AI Service; CRM solo consulta/consume | **AI Service DB** | CRM no mantiene copia editable. Son definiciones globales, sin orgId ni workspaceId. |
+| AgentInstance | Workspace | CRM GraphQL y autorización CRM | **CRM DB** | AI Service consume la configuración necesaria para runtime; cualquier caché/proyección es descartable y no editable como autoridad. |
+| WorkspaceKnowledge, KnowledgeDocument y metadatos de ingestión | Workspace | CRM expone la API y valida permisos/ownership; AI Service ejecuta ingestión/procesamiento | **AI Service DB** (knowledge_bases y documentos equivalentes) | Se conserva la persistencia actual en AI Service, evitando una migración de autoridad no acordada. MinIO almacena binarios; Qdrant y chunks/embeddings son artefactos derivados reconstruibles. |
+| SkillConfiguration, AgentRules | AgentInstance | CRM GraphQL, bajo wrk.agents.* | **CRM DB** | AI Service los consume para componer la configuración efectiva; no mantiene una copia editable paralela. |
+| ConversationMemory | AgentInstance + conversación | AI Service runtime | **AI Service DB** | No se duplica como memoria operativa en CRM. El historial conversacional de CRM, si existe, es un recurso distinto. |
+| AgentExecution, AgentExecutionLog | AgentInstance + Workspace | AI Service runtime | **AI Service DB** | CRM recibe eventos/resultados y mantiene sus registros de negocio/financieros propios; no replica el log operativo como segunda autoridad. |
+| OrganizationAICredit, CreditLedger, ExecutionBudgetAuthorization, ExecutionBudgetAllocation | Organización | CRM y sus operaciones financieras | **CRM DB** | AI Service solicita autorización y reporta usage; no persiste ni modifica el saldo/ledger como autoridad. |
+| Contacto, ContactAssignment, EvAssigned, Outbox de asignación | CRM / Workspace según ownership del recurso | CRM | **CRM DB** | EvAssigned no se sincroniza como historial. La proyección contact_assignments de AI Service es derivada. |
+| contact_assignments | Derivado de ContactAssignment | AI Service runtime | **AI Service DB**, como proyección | No es fuente de verdad; debe poder reconciliarse/reconstruirse desde CRM. |
+| AgentMessageOutbox | CRM | CRM | **CRM DB** | Mensaje de origen e intención de despacho CRM → AI Service en una misma unidad atómica; distinto del Outbox de asignación. |
+| AgentExecutionInbox | AI Service | AI Service | **AI Service DB** | Recepción durable/idempotente vinculada a un único AgentExecution y originMessageId. |
+| ExecutionResultOutbox | AI Service | AI Service | **AI Service DB** | Intención durable de publicar el resultado terminal; se confirma solo tras confirmación y enrutamiento válido del broker. |
+| ExecutionResultInbox | CRM | CRM | **CRM DB** | Recibo durable idempotente por eventId/executionId; Redis puede ser caché, no autoridad de deduplicación. |
+| Vectores, embeddings e índice de Knowledge | Derivado de WorkspaceKnowledge | AI Service ingestión/RAG | **Qdrant** (índice vectorial) y almacenamiento técnico de AI Service para chunks/metadatos de ingestión | No son fuente de verdad del documento ni de su ownership; pueden regenerarse desde el documento fuente. |
+| Binarios de documentos Knowledge | Workspace | CRM autoriza; AI Service procesa | **MinIO** (object storage) | El registro de propiedad/estado del documento permanece en AI Service DB; MinIO no es autoridad de dominio. |
+| Credenciales de proveedores LLM | Waby | Gestión exclusiva Waby | **Almacén seguro de secretos administrado por Waby**, fuera de las colecciones de dominio CRM/AI Service | Solo referencias/IDs versionados pueden aparecer en snapshots; nunca secretos. |
+
+**Consecuencias de la frontera:**
+
+1. CRM es autoridad de AgentInstance, SkillConfiguration, AgentRules, ContactAssignment y del ledger/créditos. AI Service es autoridad de AgentDefinition, Knowledge técnico, ConversationMemory y estado/log operativo de AgentExecution.
+2. WorkspaceKnowledge tiene propietario de negocio Workspace y API/controles de acceso en CRM, pero su persistencia canónica se conserva en AI Service DB. Esta separación explícita mantiene el patrón existente de fachada CRM y lectura/procesamiento AI Service; no autoriza dos colecciones editables para la misma entidad.
+3. Los vectores Qdrant, chunks y contact_assignments son proyecciones/artefactos derivados. Deben poder reconstruirse desde su fuente de verdad y no pueden decidir ownership, permisos ni asignación.
+4. AgentExecution en AI Service y los movimientos CreditLedger en CRM son entidades distintas: la primera registra el ciclo técnico; los segundos son la autoridad financiera. La correlación se hace por executionId, organizationId y workspaceId, sin duplicar un ledger en AI Service.
+5. La persistencia de Contacto + EvAssigned + Outbox de asignación en CRM queda sujeta al requisito de atomicidad de D.1.8 y a la verificación de Atlas; ARQ-14 no convierte esa verificación de infraestructura (ARQ-06) en una decisión pendiente de ownership.
+
 ### D.2 Operaciones GraphQL/HTTP necesarias
 
 #### Operaciones de plataforma Waby
@@ -654,7 +719,7 @@ Si la transacción no resulta viable, deberá diseñarse y aprobarse una alterna
 
 #### Operaciones internas CRM ↔ ai-service
 
-Las operaciones internas usan el contrato ARQ-21: JWT de servicio firmados RS256, credenciales diferenciadas por dirección (CRM → ai-service y ai-service → CRM), token de corta duración por petición y scopes mínimos por operación. Claims base: iss, sub, aud, iat, nbf, exp, jti, scope, orgId, workspaceId, agentInstanceId e initiatedBy; la obligatoriedad de cada claim depende del flujo. El receptor valida firma y algoritmo, issuer, subject esperado, audience, vigencia, scope y contexto tenant/recurso; CRM vuelve a validar ownership y estado actuales. initiatedBy solo aporta auditoría, no es principal ni autorización. Rotación/revocación de claves, anti-replay, autenticación RabbitMQ, inventario exhaustivo de operaciones/scopes y pruebas negativas siguen como detalle técnico pendiente en WAB-78.
+Las operaciones internas usan el contrato ARQ-21: JWT de servicio firmados RS256, credenciales diferenciadas por dirección (CRM → ai-service y ai-service → CRM), token de corta duración por petición y scopes mínimos por operación. Claims base: iss, sub, aud, iat, nbf, exp, jti, scope, orgId, workspaceId, agentInstanceId e initiatedBy; la obligatoriedad de cada claim depende del flujo. El receptor valida firma y algoritmo, issuer, subject esperado, audience, vigencia, scope y contexto tenant/recurso; CRM vuelve a validar ownership y estado actuales. initiatedBy solo aporta auditoría, no es principal ni autorización. Rotación/revocación de claves, anti-replay, autenticación RabbitMQ, inventario exhaustivo de operaciones/scopes y pruebas negativas son endurecimiento operativo de ARQ-21, diferido a WAB-80/WAB-81. La entrega durable e idempotencia del flujo RabbitMQ se especifican separadamente en D.6 (ARQ-22).
 
 La asignación inicial automática es una operación interna autenticada, validada y auditada de CRM. ai-service puede mantener una proyección operativa derivada de ContactAssignment, pero no una autoridad editable paralela.
 
@@ -690,6 +755,76 @@ La asignación inicial automática es una operación interna autenticada, valida
 La administración de AgentInstance utiliza `wrk.agents.*`; la lectura utiliza `wrk.agents.read`. Los permisos se declaran explícitamente en `permission.enum.ts`. Workspace Owner hereda `wrk.agents.*` mediante `wrk.*.*`; Workspace Manager recibe `wrk.agents.*` explícito; Workspace Agent recibe `wrk.agents.read`.
 
 No existe un permiso separado `bot.configure` para Skills/Rules de instancia. `wrk.agents.*` no autoriza modificar AgentDefinitions, políticas ni recursos centrales de Waby, y no sustituye membership, ownership ni autorización contextual de Capabilities. La asignación manual de contactos conserva el permiso `wrk.workspaces.update`.
+
+### D.6 Contrato de entrega durable e idempotencia del flujo asíncrono (ARQ-22)
+
+#### D.6.1 Alcance y garantía
+
+Este contrato cubre los dos tramos del ciclo de ejecución: CRM publica un mensaje de origen para iniciar la ejecución en AI Service; AI Service publica el resultado terminal para que CRM lo procese.
+
+La garantía es **entrega al menos una vez (at-least-once) con consumidores idempotentes y recuperación durable**. No se promete exactly-once a través de MongoDB, RabbitMQ, proveedores LLM y efectos externos: una confirmación puede perderse después de que el receptor haya procesado el mensaje y provocar una redelivery. La obligación es que esa redelivery no cree una segunda ejecución lógica ni duplique efectos de negocio.
+
+La autenticación/autorización del transporte y los scopes de servicio pertenecen a ARQ-21. Este contrato define durabilidad, identidad, ack, reintentos y deduplicación; no crea un mecanismo de autenticación RabbitMQ paralelo.
+
+#### D.6.2 Identidades no intercambiables
+
+| Identificador | Autoridad / origen | Función |
+|---|---|---|
+| originMessageId | CRM, asignado una sola vez al mensaje de origen | Identifica el mensaje entrante lógico. Debe permanecer estable en reintentos, republicaciones y redeliveries. |
+| executionId | AI Service, asignado al aceptar por primera vez originMessageId | Identifica la única ejecución lógica asociada al mensaje. Se conserva en recuperación/reintentos; no se genera otro por redelivery. |
+| eventId | Servicio publicador del evento | Identifica un evento de integración concreto y permite deduplicar su publicación/consumo. Se conserva al republicar el mismo evento. |
+| evAssignedId | CRM, identidad de la transición de asignación | Identifica la transición que autorizó la ejecución y resuelve ABA. No sustituye originMessageId ni executionId. |
+
+originMessageId debe ser una identidad canónica y estable de CRM. Si el identificador externo del canal no es globalmente único, se conserva junto con el sistema/canal de origen y se define una clave compuesta estable, al menos acotada por workspaceId. El contenido normalizado del mensaje puede llevar un hash para detectar reutilización conflictiva de la misma clave.
+
+#### D.6.3 Publicación CRM → AI Service
+
+1. CRM persiste el mensaje de origen y la intención de despacharlo de forma durable en una misma unidad atómica (transacción o mecanismo recuperable equivalente). La publicación se representa mediante un registro Outbox de entrada ligado al mensaje; no se reutiliza el Outbox de asignaciones de D.1.8 como si fuera el mismo evento de dominio.
+2. El publicador envía el mensaje a un exchange/cola durable con entrega persistente. Debe comprobar la confirmación positiva del broker y detectar mensajes no enrutables (por ejemplo, mediante publicación obligatoria/retorno o mecanismo equivalente). Si el cliente AMQP informa backpressure (publish devuelve false), el publicador respeta el flujo y espera drain o el mecanismo equivalente antes de continuar; esto no sustituye la confirmación del broker.
+3. El Outbox solo se marca publicado después de confirmación positiva y enrutamiento válido. Fallos, timeout o confirmación incierta dejan el registro recuperable para reintento; no se absorben como éxito.
+4. La republicación conserva originMessageId y la identidad del evento. Una confirmación incierta puede producir duplicados físicos en RabbitMQ; la deduplicación del consumidor es obligatoria.
+
+El envelope de entrada incluye como mínimo eventId, eventType, schemaVersion, occurredAt, correlationId, originMessageId, organizationId, workspaceId, agentInstanceId, conversationId, contactId, channel y el contenido normalizado necesario. Los campos tenant/recurso se validan contra CRM y el contexto autenticado; no se confía en valores libres del payload.
+
+#### D.6.4 Recepción, persistencia e idempotencia en AI Service
+
+1. El consumidor usa ack manual. Antes de confirmar el mensaje RabbitMQ, valida el envelope y persiste una recepción durable vinculada a originMessageId y a un único executionId.
+2. La unicidad lógica de recepción se aplica, como mínimo, por (workspaceId, channel, originMessageId) —o clave equivalente si CRM garantiza un ID global—. La restricción física/índice se concreta en WAB-81, pero la unicidad es parte obligatoria del contrato.
+3. La persistencia de la recepción y su asociación a la ejecución lógica debe ser atómica. Si la escritura no se confirma, el consumidor no hace ack: reintenta/reencola según política. No se acepta continuar en memoria sin registro durable.
+4. Si llega una redelivery con la misma clave y el mismo contenido lógico, el consumidor recupera la recepción/ejecución existente y hace ack sin crear otra ejecución ni volver a invocar el pipeline. Si la misma clave llega con contenido incompatible, se registra conflicto y se envía a cuarentena/DLQ; no se sobrescribe ni se ejecuta de nuevo.
+5. **Momento del ack de entrada:** AI Service confirma el mensaje RabbitMQ después de que la recepción y la ejecución lógica hayan quedado persistidas de forma durable y recuperable, no simplemente porque el handler terminó sin lanzar una excepción. No necesita mantener el mensaje RabbitMQ sin ack durante toda la llamada LLM: la ejecución durable asume la responsabilidad de continuar/recuperarse.
+6. Un worker puede recuperar una ejecución aceptada tras caída/reinicio usando la misma executionId, con control de ownership/lease/fencing de intento. Recuperar el worker no crea otra ejecución lógica.
+7. Si el resultado de una invocación LLM queda incierto (timeout/desconexión después de enviar la solicitud), no se reintenta ciegamente como si no hubiera ocurrido. Se aplica la reconciliación de invocaciones y usage de P4, preservando invocationId/estado económico y evitando duplicar efectos cuando el proveedor no permite determinar el resultado.
+
+#### D.6.5 Publicación AI Service → CRM y consumo idempotente
+
+1. Al finalizar una ejecución, AI Service persiste el estado/resultado terminal y la intención de publicar el evento correspondiente como una única unidad atómica de persistencia (Transactional Outbox o mecanismo atómico equivalente, recuperable y verificable en WAB-81). No puede existir un resultado terminal confirmado sin una intención durable de publicarlo.
+2. El publicador de resultados utiliza mensajes persistentes y confirmación positiva del broker. Solo marca el Outbox como publicado después de confirmación y enrutamiento válido. Ante backpressure respeta drain/flow control; ante fallo o resultado incierto conserva el evento para reintento; nunca convierte un fallo de publicación en éxito.
+3. eventId y executionId permanecen estables en cada republicación. CRM registra un recibo durable de inbox con unicidad por eventId y executionId y persiste la aceptación del resultado junto con la intención de cualquier despacho posterior en una misma unidad atómica o mecanismo recuperable equivalente, antes del ack. Redis puede acelerar la deduplicación, pero no es su autoridad ni puede operar fail-open. La deduplicación actual basada solo en Redis SET NX no satisface este contrato.
+4. execution.completed solo representa una ejecución completada. Las ejecuciones failed o cancelled no se publican como completadas; la semántica del evento respeta los contratos de cancelación/invalidez de ARQ-07.
+5. CRM conserva su autoridad para validar ownership, asignación vigente y evAssignedId antes de cualquier efecto externo (ARQ-05/08 y E.4.11/E.4.12). La aceptación durable del evento y la creación de una intención durable de despacho deben preceder al ack; los envíos a canales externos conservan su propia identidad/idempotencia y política de reconciliación. Si el proveedor externo no ofrece idempotencia y el resultado de aceptación es incierto, no se promete exactly-once ni se reintenta ciegamente.
+
+#### D.6.6 Reintentos, DLQ y recuperación
+
+- Errores transitorios de publicación/consumo se reintentan con backoff y límites operativos; no se permite un ciclo de requeue inmediato e infinito.
+- Mensajes inválidos, incompatibles o que agoten la política de reintentos se envían a una Dead Letter Queue (DLQ) con su identidad original y causa; no se descartan silenciosamente.
+- La recuperación/replay desde DLQ conserva originMessageId, executionId si ya fue asignado y eventId del evento original. No genera una identidad nueva para sortear la deduplicación.
+- Los Outbox pendientes, inboxes aceptados y ejecuciones no terminales deben ser recuperables tras reinicio del proceso. La retención/operación concreta de DLQ, backoff, leases y límites se especifica en WAB-81.
+- El sistema debe poder distinguir al menos: pendiente de publicar, confirmado por broker, recibido durablemente, en proceso, terminal y en cuarentena/DLQ. La transición física y el modelo de estados se detallan en WAB-81 sin debilitar estas garantías.
+
+#### D.6.7 Criterios de aceptación del contrato
+
+1. Caída del publicador antes de confirmación: el Outbox permanece pendiente y se reintenta.
+2. Confirmación de broker incierta o caída después de publicar: la republicación puede duplicar el mensaje físico, pero no crea otra ejecución lógica.
+3. Redelivery de entrada: mismo originMessageId recupera el mismo executionId; no se vuelve a invocar el pipeline si ya está aceptado/procesado.
+4. Caída del worker tras ack de entrada: la ejecución durable puede recuperarse sin depender de una nueva entrega del mensaje original.
+5. Fallo del publicador de resultado: el resultado terminal conserva su Outbox pendiente hasta confirmación.
+6. Redelivery del resultado: el inbox durable de CRM reconoce eventId/executionId ya aceptados, no repite la aceptación lógica y luego confirma el mensaje. La entrega al canal externo es una frontera posterior con su propia idempotencia/reconciliación.
+7. Una clave repetida con contenido incompatible se pone en cuarentena y no ejecuta.
+8. Una ejecución cancelada/fallida nunca se interpreta como execution.completed.
+9. Los fallos ambiguos de invocación LLM respetan P4; no se promete exactly-once del proveedor ni se duplica consumo por reintento ciego.
+
+**Límite de fase:** WAB-78 fija estas garantías y responsabilidades. La implementación de Outbox/inbox, índices, confirmaciones RabbitMQ, consumidores, reintentos, DLQ, leases, recuperación y pruebas de fallo corresponde a WAB-81. La autenticación del broker y el inventario de scopes continúan bajo ARQ-21/WAB-80/WAB-81. No se modifica código ni infraestructura en esta fase.
 
 ## E. Runtime y routing
 
@@ -816,6 +951,8 @@ Entrada (RabbitMQ / HTTP interno)
 │    y publicar resultado │    respuesta assistant (máximo 20, FIFO).       │
 └─────────────────────────┘
 ```
+
+**Garantías de mensajería:** la entrada y salida de este flujo siguen D.6 (ARQ-22): CRM publica desde Outbox; AI Service hace ack tras aceptación durable en inbox/ejecución; el resultado se publica desde Outbox con confirmación; CRM consume idempotentemente. El ack de entrada no queda ligado a mantener abierta la entrega RabbitMQ durante toda la ejecución LLM.
 
 ### E.2 Resolución de AgentInstance
 
@@ -1524,6 +1661,8 @@ Los desgloses por Workspace y AgentInstance son estadísticas y atribución. No 
 | Policy Engine | Crear → políticas no delegables | No existe hoy (Fase 1, R8) | I8 |
 | Output filter | Crear → filtrar respuesta antes de enviar | No existe hoy (Fase 1, R11) | I8, I9 |
 
+**Frontera de persistencia objetivo (ARQ-14):** AgentInstance y SkillConfiguration/AgentRules persisten en CRM; AgentDefinition, WorkspaceKnowledge/documentos, ConversationMemory y AgentExecution/AgentExecutionLog persisten en AI Service DB. Qdrant es índice derivado, MinIO almacena binarios y CRM conserva los créditos/ledger. La matriz normativa completa está en D.1.9. La persistencia de Knowledge se mantiene en AI Service DB; no se introduce una migración de fuente de verdad a CRM.
+
 ### H.2 Correspondencia Bot → AgentDefinition / AgentInstance
 
 | Campo de Bot actual | Destino en modelo objetivo | Notas |
@@ -1798,8 +1937,14 @@ La secuencia de implementación se mantiene como planificación posterior y debe
 La secuencia y las dependencias operativas se consultan en Linear. No iniciar WAB-79 ni fases posteriores hasta que WAB-78 sea revisada y autorizada expresamente.
 
 **Decisiones vigentes:** ARQ-19/20/21, DEC-CM-01..08 y P4.
-**Pendientes técnicos de WAB-78:** inventario de operaciones internas y scopes; rotación/revocación/replay y autenticación RabbitMQ; contrato de vigencia/cancelación de ejecuciones; consistencia integral de entidades, matrices, diagramas y ADRs; detalles P9/P10 no resueltos expresamente.
-**No inferir aprobación:** las propuestas D5 y detalles técnicos pendientes siguen pendientes en los términos de Linear.
+**Pendientes de contrato para completar WAB-78:**
+- **ARQ-14 — ownership de persistencia: resuelto en D.1.9 y B.** Se distinguen propietario de negocio, superficie API y servicio persistente para cada entidad y sus proyecciones.
+- **ARQ-22 — entrega asíncrona e idempotencia: resuelto como contrato en D.6.** Se fijan entrega at-least-once, identidades estables, aceptación durable antes del ack, Outbox de resultado con confirmación, deduplicación, recuperación y DLQ. La implementación queda en WAB-81.
+- **Verificación cruzada final:** comprobar que el inventario A.2, diagrama B, matriz D.1.9, D.6, H.1, ADRs y escenarios de integración no se contradigan; no repetir diagnósticos D1–D5 ni reabrir decisiones.
+
+**Trabajo técnico diferido (no son decisiones de producto pendientes):** la matriz exhaustiva operación × emisor × receptor × audience × scope × claims, rotación/revocación y anti-replay de JWT, autenticación RabbitMQ, pruebas negativas y despliegue de ARQ-21; verificación de transacciones MongoDB Atlas y su implementación para ARQ-06; implementación de invalidación/cancelación y validaciones de vigencia para ARQ-07/08. Se ejecuta en las fases técnicas correspondientes, manteniendo los contratos ya aprobados.
+
+**Decisiones no reabribles:** ARQ-19/20/21 como dirección y contrato base; DEC-CM-01..08; P1/P2/P4/P9/P10 y reconciliación D5-A/B/C. La falta de implementación no revoca su aprobación. Los detalles de reversibilidad/purga de P9 y versionado/retención de Knowledge de P10 solo permanecen abiertos en la medida exacta en que no estén cubiertos por las decisiones registradas; no usar esa frase genérica para reabrir P9/P10.
 
 ## L. Criterios de finalización de Fase 2
 
@@ -1816,7 +1961,9 @@ La secuencia y las dependencias operativas se consultan en Linear. No iniciar WA
 
 **Ruta canónica prevista:** `projects/agents-multitenant/design/fase-2-diseno-objetivo-y-contratos.md` en `sinies7ro/waby-docs`.
 
-**Siguiente paso:** revisión integral del diseño reconciliado y autorización expresa del usuario. WAB-78 permanece In Progress; WAB-79 no se inicia hasta esa autorización.
+**Estado de cierre documental (07/11/2026):** ARQ-14 y ARQ-22 tienen contrato de diseño documentado en D.1.9/B y D.6, respectivamente. La verificación cruzada entre inventario, diagramas, contratos, ADRs y los 15 escenarios D3 quedó completada documentalmente el 07/11/2026. Las pruebas de integración no se consideran ejecutadas. El diseño queda listo para revisión y autorización expresa del usuario; esta verificación no cierra WAB-78 por sí sola.
+
+**Siguiente paso:** presentar el diseño completo al usuario para revisión y autorización expresa. WAB-78 permanece In Progress y WAB-79 no se inicia hasta esa autorización.
 
 ---
 *Documento de diseño exclusivamente. No se modifica código, schemas, colecciones, resolvers, endpoints ni infraestructura durante esta fase.*

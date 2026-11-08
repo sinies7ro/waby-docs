@@ -1,3 +1,7 @@
+> **Nota de vigencia — 07/11/2026:** este informe conserva la evidencia histórica D1. ARQ-14 queda resuelto como contrato de diseño en D.1.9/B del documento canónico: propietario de negocio, superficie API y persistencia están declarados por entidad. ARQ-18 queda reconciliado en A.2/B con EvAssigned y la conservación condicional de contactAssignmentHistory como compatibilidad histórica. Las clasificaciones originales de bloqueo se conservan como procedencia, no como estado vigente. No se afirma implementación.
+
+---
+
 # WAB-78 — Informe del Bloque 1: Dominio y ownership (D1)
 
 **Fecha:** 04/11/2026 · **Sesión:** individual 1 · **Estado del bloque:** Revisado

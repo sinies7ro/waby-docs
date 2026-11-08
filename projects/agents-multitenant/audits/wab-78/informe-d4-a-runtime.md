@@ -1,3 +1,7 @@
+> **Nota de vigencia — 07/11/2026:** este informe mantiene su alcance de auditoría runtime. ARQ-14 queda resuelto en D.1.9/B del diseño canónico. La fila D4A-C12 que remite a “contrato definido en D3/WAB-81” queda superada: D3 había identificado la brecha, pero no había documentado el contrato integral. ARQ-22 queda especificado en D.6; la implementación se difiere a WAB-81. Esta nota no afirma que las brechas estén corregidas en código.
+
+---
+
 # WAB-78 — Informe D4-A: Auditoría de Runtime y configuración efectiva
 
 **Fecha:** 05/11/2026 · **Bloque:** D4-A (Runtime y configuración efectiva) · **Modo:** Solo lectura y diagnóstico

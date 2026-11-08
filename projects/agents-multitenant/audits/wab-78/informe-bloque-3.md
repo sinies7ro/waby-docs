@@ -1,3 +1,7 @@
+> **Nota de vigencia — 07/11/2026:** este informe conserva la evidencia del diagnóstico D3. ARQ-14 queda resuelto como contrato de diseño en D.1.9/B. ARQ-22 se identificó aquí como brecha de confiabilidad, pero la mención histórica a que su contrato estaba “definido en D3/WAB-81” no era correcta: D3 enumeró requisitos y criterios, no un contrato integral de entrega/ack/recuperación. El contrato objetivo queda especificado en D.6 del diseño canónico; su implementación corresponde a WAB-81. La evidencia as-is y la ausencia de reproducción de impacto productivo no cambian.
+
+---
+
 # WAB-78 — Informe del Bloque 3: Routing y asignaciones (D3)
 
 **Fecha:** 04/11/2026 · **Estado del bloque:** Revisado (diagnóstico completado) — presente documento es una reconciliación posterior con evidencia adicional verificada; no se emite veredicto global WAB-78.
