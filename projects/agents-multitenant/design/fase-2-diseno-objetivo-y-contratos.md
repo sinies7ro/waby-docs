@@ -1,15 +1,15 @@
 # WAB-78 — Fase 2: Diseño objetivo y contratos
 
-> **Estado documental actualizado al 07/11/2026.** Este documento es el diseño integral de Fase 2 reconciliado con las decisiones aprobadas en Linear. En caso de contradicción prevalecen ARQ-19/20/21, DEC-CM-01..08 y P4 aprobada. Los acuerdos conceptuales no implican implementación. WAB-78 permanece In Progress; no cerrar la fase ni iniciar WAB-79 sin autorización expresa.
+> **Estado documental actualizado al 09/11/2026.** Este documento es el diseño integral de Fase 2 reconciliado con las decisiones aprobadas en Linear y la decisión D-W79-01. En caso de contradicción prevalecen ARQ-19/20/21, DEC-CM-01..08 y P4 aprobada. Los acuerdos conceptuales no implican implementación. WAB-78 figura Done en Linear desde el 08/11/2026; WAB-79 permanece Backlog y no se ha iniciado formalmente.
 >
 > **Cambios de vigencia:** P1 sustituye el cupo comercial antiguo y deja sin vigencia I3 en lo relativo a límites de cantidad; se retiraron las reglas antiguas de cupos 1/2 y downgrade, routing persistente canal→instancia, permisos `platform.*`/`bot.configure`/`wrk.agent.use`, y la autoridad exclusiva de Waby sobre el ciclo de vida lógico de AgentInstance. Ver el [registro de reconciliación](./reconciliacion-vigencia-fase-2-wab-78.md).
 
 
-**Padre:** WAB-75 · **Fase:** WAB-78 · **Estado:** Diseño (previo a implementación) · **Fecha:** 02/11/2026
+**Padre:** WAB-75 · **Fase:** WAB-78 · **Estado:** Diseño completado (sin implementación) · **Fecha de creación:** 02/11/2026 · **Cierre en Linear:** 08/11/2026
 
-**Regla de cierre:** WAB-78 NO se cierra ni WAB-79 se inicia hasta que el usuario revise y autorice explícitamente. Este documento es de solo diseño: no se modifica código, schemas, colecciones, resolvers, endpoints ni infraestructura.
+**Estado actual:** WAB-78 está Done en Linear. WAB-79 permanece Backlog y no se ha iniciado formalmente. Este documento define contratos de diseño; no implica autorización para modificar código, schemas, colecciones, resolvers, endpoints ni infraestructura.
 
-**Actualización aprobada (03/11/2026):** P4 queda aprobada, incluida la política híbrida de facturación G.4.6 y un período de gracia de **30 días** para operaciones que permanezcan en `reconciliation_required` sin evidencia concluyente. Esta aprobación no cierra WAB-78 ni autoriza la implementación o el inicio de WAB-79.
+**Actualización aprobada (03/11/2026):** P4 quedó aprobada, incluida la política híbrida de facturación G.4.6 y un período de gracia de **30 días** para operaciones que permanezcan en `reconciliation_required` sin evidencia concluyente. Esta aprobación fue una decisión de alcance; el cierre posterior de WAB-78 se registró en Linear el 08/11/2026. No implica autorización para implementar WAB-79.
 
 ---
 
@@ -19,7 +19,7 @@ Esta fase diseña la transformación del modelo actual **Bot / BotInstance** en 
 
 El diseño se basa en los hallazgos de la Fase 1 (WAB-77, [informe consolidado](../audits/wab-77/informe-consolidado-fase-1.md)) y toma como referencia las invariantes I1–I21 de WAB-75 §2. La antigua I3 relativa a cupos comerciales queda supersedida por P1 aprobada: no hay límite comercial de AgentInstance por Workspace ni Organización.
 
-**Decisiones resueltas que no se reabren:** P1 (sin cupo comercial), P2 (reglas funcionales de asignación y routing consolidadas en DEC-CM-04/06/08), P3 (modelo híbrido ARQ-19 y permisos ARQ-20), P4 (política híbrida G.4.6 aprobada), P9 (cinco estados; pendientes solo los detalles de retiro indicados), P10 (snapshot inmutable por ejecución con referencias identificables/versionadas de configuración y Knowledge; permanecen pendientes la política de publicación, ciclo de versionado y retención de Knowledge). Permanecen abiertos los contratos técnicos enumerados al final y en Linear.
+**Decisiones resueltas que no se reabren:** P1 (sin cupo comercial), P2 (reglas funcionales de asignación y routing consolidadas en DEC-CM-04/06/08), P3 (modelo híbrido ARQ-19 y permisos ARQ-20), P4 (política híbrida G.4.6 aprobada), P9 (cinco estados; pendientes solo los detalles de retiro indicados), P10 (snapshot inmutable por ejecución; AgentDefinition conserva identidad estable sin versiones publicadas; permanecen pendientes únicamente los aspectos específicos de publicación/versionado/retención de Knowledge no resueltos por su contrato). Permanecen abiertos los contratos técnicos enumerados al final y en Linear.
 
 ---
 
@@ -32,7 +32,7 @@ La auditoría de Fase 1 confirmó que `Bot` mezcla definición + instancia. No h
 **Entidades actuales reutilizables:**
 - `Execution` → se conserva y amplía con campos de auditoría (I20, I21)
 - `KnowledgeBase` → se conserva como `WorkspaceKnowledge` (compartido por workspace, I11)
-- `Prompt` / `PromptVersion` → se reutilizan como base de `AgentDefinition` (versión de definición)
+- `Prompt` / `PromptVersion` → se reutilizan solo en lo que corresponda al almacenamiento del prompt; `AgentDefinition` conserva identidad estable y no tiene versiones publicadas.
 - `MemoryFact` → se reemplaza por `ConversationMemory` (ventana 20, I14)
 - `BotCredential` → se elimina; credenciales de proveedores LLM centralizadas en Waby (I6)
 
@@ -76,16 +76,17 @@ Propiedad de la plataforma Waby. Representa la definición lógica de un agente:
 | presencePenalty | Decimal | No | Penalidad de presencia (default 0) |
 | defaultSkills | JSON[] | No | Plantilla inicial de Skills que se copia a la nueva AgentInstance al crearla; no se hereda dinámicamente |
 | defaultRules | JSON[] | No | Plantilla inicial de Rules que se copia a la nueva AgentInstance al crearla; no se hereda dinámicamente |
-| version | Integer | Sí | Versión de la definición |
-| status | Enum | Sí | `draft` / `active` / `retired` |
+| status | Enum | Sí | `draft` / `active` / `suspended` / `retired` |
 | createdBy | String | Sí | Usuario de Waby que creó la definición |
 | createdAt | Timestamp | Sí | Fecha de creación |
 | updatedAt | Timestamp | Sí | Fecha de última actualización |
 | retiredAt | Timestamp | No | Fecha de retiro |
 
+`id` es la identidad lógica estable e inmutable de la definición. No existe versionado publicado de AgentDefinition ni una referencia de AgentInstance a una versión fija. Los cambios en la configuración vigente de una definición se aplican a todas sus AgentInstance asociadas en las nuevas ejecuciones. `draft` no permite ejecuciones; `active` permite nuevas ejecuciones; `suspended` y `retired` bloquean nuevas ejecuciones de todas las instancias vinculadas. `retired` es terminal.
+
 **Cardinalidad:** Una AgentDefinition puede tener cero o más AgentInstance asociadas (1:N, sin unicidad workspaceId+agentDefinitionId per I16).
 
-**Inicialización de AgentInstance:** al crear una instancia, `defaultSkills` y `defaultRules` de la versión de AgentDefinition utilizada se copian como configuración inicial en sus `SkillConfiguration` y `AgentRules`. Son plantillas de inicialización, no herencia dinámica: los cambios posteriores en los valores por defecto de AgentDefinition no modifican instancias existentes. Cada Workspace administra luego la configuración permitida de su instancia, sujeta a las políticas Waby.
+**Inicialización de AgentInstance:** al crear una instancia, `defaultSkills` y `defaultRules` vigentes en AgentDefinition se copian como configuración inicial en sus `SkillConfiguration` y `AgentRules`. Son plantillas de inicialización, no herencia dinámica: una vez copiadas, Skills y Rules continúan siendo configuración propia de cada AgentInstance. Los cambios posteriores en el prompt base, proveedor/modelo y demás configuración central vigente de AgentDefinition sí se aplican a todas las instancias vinculadas en nuevas ejecuciones. Cada Workspace administra la configuración permitida de Skills/Rules de su instancia, sujeta a las políticas Waby.
 
 #### AgentInstance (Workspace)
 Propiedad de un Workspace. Representa una instancia ejecutable de una AgentDefinition asignada a un Workspace específico.
@@ -128,7 +129,7 @@ Ejecución individual de un agente para procesar un mensaje de usuario.
 | input | String | Sí | Mensaje de entrada |
 | promptSnapshotHash | String | Sí | SHA-256 del prompt efectivo construido (I21, P7) |
 | effectiveConfigHash | String | Sí | SHA-256 de la configuración efectiva completa (AgentDefinition, Rules, Skills, capabilities, provider, modelo, routing, parámetros) (P10) |
-| effectiveConfigSnapshot | JSON | Sí | Snapshot inmutable sin secretos. Incluye como mínimo referencias identificables y versionadas de AgentDefinition, Skills y SkillConfiguration, Rules, capabilities, Knowledge Bases, documentos y fragmentos incorporados al contexto; puede incluir valores efectivos adicionales para reproducibilidad técnica (P7, P10) |
+| effectiveConfigSnapshot | JSON | Sí | Snapshot inmutable sin secretos. Incluye identidad estable y configuración efectiva capturada de AgentDefinition, más referencias identificables y versionadas de Skills y SkillConfiguration, Rules, capabilities, Knowledge Bases, documentos y fragmentos incorporados al contexto; puede incluir valores efectivos adicionales para reproducibilidad técnica (P7, P10) |
 | providerModelUsed | String | Sí | Proveedor y modelo realmente usado (I21) |
 | inputTokens | Integer | Sí | Tokens de entrada |
 | outputTokens | Integer | Sí | Tokens de salida |
@@ -144,7 +145,7 @@ Ejecución individual de un agente para procesar un mensaje de usuario.
 
 **Cardinalidad:** Una AgentExecution pertenece a una AgentInstance (N:1), a un Workspace (N:1) y a una Organización (N:1). Una AgentInstance puede tener cero o más AgentExecution (1:N). `organizationId` debe coincidir con la Organización a la que pertenece el Workspace; no se confía en un organizationId recibido libremente en mensajes RabbitMQ o solicitudes internas.
 
-**Nota de trazabilidad:** `prompt_snapshot_hash` identifica el prompt efectivo; `effective_config_hash` identifica el conjunto completo de configuración efectiva. Ninguno de estos hashes permite reconstruir la ejecución por sí solo; para reproducibilidad completa se requiere `effective_config_snapshot` (si se almacena) o las versiones inmutables de AgentDefinition, Rules y Skills referenciadas.
+**Nota de trazabilidad:** `prompt_snapshot_hash` identifica el prompt efectivo; `effective_config_hash` identifica el conjunto completo de configuración efectiva. Ninguno de estos hashes permite reconstruir la ejecución por sí solo; para reproducibilidad completa se requiere `effective_config_snapshot`, que conserva la identidad estable y configuración efectiva capturada de AgentDefinition, además de las referencias versionadas aplicables a Rules y Skills.
 
 #### WorkspaceKnowledge
 Knowledge perteneciente al Workspace, compartido por todas sus AgentInstance (I11).
@@ -434,8 +435,8 @@ Quedan sustituidas y sin vigencia las reglas anteriores de cupos de una/dos inst
 
 El modelo de autoridad es híbrido por operación (ARQ-19):
 
-1. Waby publica y mantiene AgentDefinitions y el catálogo central.
-2. Un usuario humano autorizado del Workspace crea una AgentInstance a partir de una definición publicada.
+1. Waby gestiona y mantiene AgentDefinitions y el catálogo central; controla su configuración vigente y sus estados, sin versionado publicado de la definición.
+2. Un usuario humano autorizado del Workspace crea una AgentInstance a partir de una AgentDefinition en estado `active`; no existe una versión publicada fija de la definición.
 3. CRM valida membership, permiso `wrk.agents.*`, ownership del Workspace y estado de la definición.
 4. CRM persiste la AgentInstance y su ownership `AgentInstance → Workspace → Organización`.
 5. El usuario autorizado configura los parámetros empresariales permitidos, Skills/Rules habilitadas, integraciones permitidas y `additionalPrompt`.
@@ -460,7 +461,7 @@ Se permiten múltiples AgentInstances derivadas de una misma AgentDefinition, in
 
 | Operación | Autoridad | Efecto |
 |---|---|---|
-| Crear/configurar AgentInstance | Usuario autorizado del Workspace; CRM valida y persiste | Crea o actualiza configuración empresarial dentro de la definición publicada y los límites de Waby |
+| Crear/configurar AgentInstance | Usuario autorizado del Workspace; CRM valida y persiste | Crea o actualiza configuración empresarial dentro de la configuración central vigente de AgentDefinition y los límites de Waby |
 | Provisioning técnico | Waby | Prepara recursos técnicos y aplica políticas de plataforma |
 | Activar/suspender/reanudar | Usuario autorizado del Workspace, sujeto a políticas y validaciones de Waby | Cambia el ciclo de vida lógico |
 | Retiro lógico | Usuario autorizado del Workspace | Deja de recibir asignaciones y ejecuciones conforme al contrato de retiro |
@@ -477,9 +478,12 @@ La suspensión no equivale al retiro ni a la purga física. La eliminación de u
 
 **Mecanismo aprobado (P10):** instantánea inmutable de configuración efectiva al comenzar cada ejecución.
 
-- Al iniciar una ejecución, el sistema crea una **instantánea inmutable** de la configuración efectiva: AgentDefinition (versión activa), Rules, Skills, capabilities, knowledgeBaseIds y parámetros de ejecución de la AgentInstance.
+**Alineación D-W79-01 (decisión de diseño aprobada para WAB-79, 09/11/2026):** AgentDefinition conserva identidad lógica estable, sin versiones publicadas. Su configuración vigente se aplica a todas las AgentInstance vinculadas en nuevas ejecuciones; solo el estado `active` permite nuevas ejecuciones y `draft`, `suspended` o `retired` las bloquean para todas las instancias asociadas. El runtime valida el estado vigente y la propagación invalida/refresca caché. Las ejecuciones iniciadas conservan su snapshot y no se cancelan retroactivamente por cambios ordinarios.
+
+- Al iniciar una ejecución, el sistema crea una **instantánea inmutable** de la configuración efectiva: AgentDefinition identificada por su ID estable y configuración vigente, Rules, Skills, capabilities, knowledgeBaseIds y parámetros de ejecución de la AgentInstance.
 - La ejecución en curso conserva sus definiciones hasta finalizar. Los cambios posteriores en AgentDefinition, Rules, Skills o capabilities se aplican únicamente a las **nuevas ejecuciones**, nunca a la ejecución en curso.
-- Cambio en AgentDefinition: la instancia mantiene una referencia estable y las nuevas ejecuciones resuelven la última versión publicada (DEC-CM-01). El cambio es explícito, autorizado y auditado; si la nueva versión es incompatible con la configuración de una instancia, esa instancia se suspende hasta que un usuario autorizado la revise y corrija (DEC-CM-05). Los cambios relevantes se notifican a los Workspaces afectados.
+- AgentDefinition no tiene versiones publicadas. La AgentInstance mantiene una referencia estable a su ID; los cambios autorizados y auditados en la configuración vigente se aplican a todas las instancias vinculadas en nuevas ejecuciones. La propagación debe invalidar o refrescar la caché antes de aceptar nuevas ejecuciones, para impedir el uso de configuración obsoleta. Los cambios relevantes se notifican a los Workspaces afectados.
+- El estado de AgentDefinition se valida antes de cada nueva ejecución: solo `active` permite ejecutar. `draft`, `suspended` y `retired` bloquean nuevas ejecuciones de todas las AgentInstance asociadas. `retired` es terminal. Las ejecuciones ya iniciadas conservan su snapshot y no se cancelan retroactivamente por un cambio ordinario de estado; una política de seguridad puede ordenar su cancelación explícita.
 - Proveedor, modelo, credenciales y parámetros técnicos base son administrados por Waby. La allowlist de parámetros configurables por AgentInstance queda vacía por defecto; no se expone un objeto libre de configuración del proveedor (DEC-CM-03).
 - Cambio en SkillConfiguration o AgentRules → evento `agent_instance.updated` → afecta solo a nuevas ejecuciones; las ejecuciones en curso mantienen su instantánea.
 - Sin flujo draft/release para el cliente (I17). Los cambios de Waby se propagan inmediatamente a nuevas ejecuciones.
@@ -495,26 +499,26 @@ Se definen dos hashes con propósitos distintos:
 | Hash | Qué identifica | Campos que participan | Normalización antes de SHA-256 |
 |------|---------------|----------------------|-------------------------------|
 | `promptSnapshotHash` | Prompt efectivo construido | systemPrompt, Rules contenido, Skills contenido, knowledgeBaseIds (IDs solo, no contenido), mensajes de memoria, historial | Serialización JSON ordenada por clave, sin espacios, sin secretos |
-| `effectiveConfigHash` | Configuración efectiva completa | AgentDefinition.id + version, agentInstanceId, skill IDs + versiones, rule IDs + versiones, capability IDs, provider, model, temperatura, maxTokens, knowledgeBaseIds | Serialización JSON ordenada por clave, sin espacios, sin secretos, sin credenciales |
+| `effectiveConfigHash` | Configuración efectiva completa | AgentDefinition.id + configuración efectiva capturada, agentInstanceId, skill IDs + versiones, rule IDs + versiones, capability IDs, provider, model, temperatura, maxTokens, knowledgeBaseIds | Serialización JSON ordenada por clave, sin espacios, sin secretos, sin credenciales |
 
-**Nota importante:** Ningún hash por sí solo permite reconstruir una ejecución. `promptSnapshotHash` identifica el prompt; `effectiveConfigHash` identifica la configuración. Cada ejecución debe conservar `effectiveConfigSnapshot` con las referencias identificables y versionadas obligatorias. El acceso posterior a las versiones inmutables permite resolver esas referencias, pero no sustituye la persistencia del snapshot en la ejecución.
+**Nota importante:** Ningún hash por sí solo permite reconstruir una ejecución. `promptSnapshotHash` identifica el prompt; `effectiveConfigHash` identifica la configuración. Cada ejecución debe conservar `effectiveConfigSnapshot` con la identidad y configuración efectiva capturada de AgentDefinition, junto con las referencias identificables y versionadas aplicables a Rules, Skills y Knowledge. La resolución posterior de esas referencias no sustituye la persistencia del snapshot en la ejecución.
 
 ---
 
 #### C.7.2 Configuración inmutable: snapshot persistido vs referencias mutables
 
-El snapshot **no es solo una lista de IDs** que se vuelven a resolver contra registros mutables. Cada ejecución conserva referencias estables y versionadas de la configuración y del contexto realmente utilizados, de modo que los cambios posteriores no alteren la evidencia histórica.
+El snapshot **no es solo una lista de IDs** que se vuelven a resolver contra registros mutables. Cada ejecución conserva la configuración efectiva de AgentDefinition capturada al inicio y referencias estables/versionadas de los recursos que tengan versionado propio, junto con el contexto realmente utilizado, de modo que los cambios posteriores no alteren la evidencia histórica.
 
 `effectiveConfigSnapshot` es obligatorio y contiene, como mínimo:
 
-- AgentDefinition: `id` y versión publicada.
+- AgentDefinition: `id` estable, configuración efectiva capturada y hash de esa configuración; no se registra una versión publicada inexistente.
 - Skills y configuración efectiva: IDs y versiones de Skill y SkillConfiguration.
 - Rules: IDs y versiones de las reglas aplicadas.
 - Capabilities: identificadores y versión/revisión cuando el catálogo la exponga.
 - Knowledge: IDs de las Knowledge Bases habilitadas, documentos recuperados con su versión y fragmentos efectivamente incorporados al contexto con sus IDs, versión/revisión disponible y hash de contenido.
 - Referencias de proveedor/modelo y parámetros técnicos efectivos no secretos.
 
-El snapshot puede incluir además una copia de los valores efectivos (por ejemplo, texto de Rules/Skills y prompt) para mejorar la reproducibilidad técnica. Esa copia adicional no sustituye las referencias identificables/versionadas obligatorias ni autoriza almacenar secretos.
+El snapshot incluye la configuración efectiva capturada de AgentDefinition y puede incluir además valores efectivos (por ejemplo, texto de Rules/Skills y prompt) para mejorar la reproducibilidad técnica. Esta captura no sustituye las referencias identificables/versionadas aplicables a recursos que sí tienen versionado propio ni autoriza almacenar secretos.
 
 ---
 
@@ -542,13 +546,13 @@ Si una fuente o fragmento no dispone de versionado propio, se conserva su identi
 
 | Aspecto | Nivel 1: Reconstrucción de configuración | Nivel 2: Trazabilidad del contexto | Nivel 3: Reproducción de ejecución |
 |---------|------------------------------------------|--------------------------------------|------------------------------------|
-| Qué se almacena | AgentDefinition.id+version, Rule.id+version, Skill.id+version, SkillConfiguration.id+version, capability IDs/versiones disponibles, provider/model, parámetros y knowledgeBaseIds | IDs/versiones de documentos y chunks recuperados; IDs y hashes de los fragmentos efectivamente incorporados al contexto | Copia adicional de valores efectivos (sin secretos), cuando se requiera mayor reproducibilidad |
+| Qué se almacena | AgentDefinition.id + configuración efectiva capturada, Rule.id+version, Skill.id+version, SkillConfiguration.id+version, capability IDs/versiones disponibles, provider/model, parámetros y knowledgeBaseIds | IDs/versiones de documentos y chunks recuperados; IDs y hashes de los fragmentos efectivamente incorporados al contexto | Copia adicional de valores efectivos (sin secretos), cuando se requiera mayor reproducibilidad |
 | Puede reconstruir el prompt exacto | ❌ No, por referencias solamente | ❌ No, por referencias solamente | Puede reconstruir las condiciones de entrada; no garantiza la salida exacta |
 | Puede reproducir respuesta LLM exacta | ❌ No | ❌ No | ❌ No (modelos no deterministas) |
 | Costo de almacenamiento | Bajo | Medio | Mayor |
 | Uso recomendado | Auditoría obligatoria de configuración por ejecución | Auditoría obligatoria del contexto RAG utilizado | Reproducción técnica adicional de condiciones de entrada (P7) |
 
-**Decisión de diseño:** Los niveles 1 y 2 son obligatorios para cada ejecución y sus referencias se conservan en `AgentExecution.effectiveConfigSnapshot`, que es la fuente de verdad del snapshot inmutable. `AgentExecutionLog` registra eventos cronológicos y puede incluir referencias al snapshot, pero no lo sustituye ni almacena una copia alternativa de sus referencias obligatorias. La copia completa de valores efectivos del Nivel 3 es complementaria y puede optimizarse por almacenamiento, pero nunca se degradan ni omiten las referencias versionadas de configuración, documentos y fragmentos realmente utilizados.
+**Decisión de diseño:** Los niveles 1 y 2 son obligatorios para cada ejecución y su contenido se conserva en `AgentExecution.effectiveConfigSnapshot`, fuente de verdad del snapshot inmutable. `AgentExecutionLog` registra eventos cronológicos y puede incluir referencias al snapshot, pero no lo sustituye ni almacena una copia alternativa de su contenido obligatorio. La copia adicional de valores efectivos del Nivel 3 es complementaria y puede optimizarse por almacenamiento, pero nunca se degradan ni omiten las referencias versionadas de Rules, Skills, documentos y fragmentos realmente utilizados; la configuración efectiva de AgentDefinition se conserva directamente en el snapshot.
 
 **Limitación importante:** Ningún nivel garantiza reproducibilidad exacta de la respuesta LLM. Los modelos de lenguaje son no deterministas, los proveedores pueden cambiar sus modelos, y las herramientas externas pueden devolver resultados diferentes. El snapshot garantiza trazabilidad de la configuración de entrada (Nivel 1) y del contexto (Nivel 2), no reproducibilidad de la salida (Nivel 3 solo reproduce condiciones de entrada, no el resultado exacto).
 
@@ -565,7 +569,7 @@ La tabla siguiente describe la superficie de gestión y las responsabilidades fu
 | Responsabilidad | CRM (Backend) | AI Service | Observaciones |
 |-----------------|---------------|------------|---------------|
 | Gestión de Workspaces y Organizaciones | ✅ | ❌ | Tenant → Workspace → Permission → Hierarchy → Operation |
-| Gestión de AgentDefinition | ❌ (solo lectura) | ✅ (Waby-only) | Crear/editar/versionar/retirar definiciones |
+| Gestión de AgentDefinition | ❌ (solo lectura) | ✅ (Waby-only) | Crear/editar/activar/suspender/retirar definiciones; sin versiones publicadas |
 | Gestión de AgentInstance | ✅ (autoridad de dominio y persistencia) | Ejecuta runtime/proyecciones derivadas | Usuarios autorizados del Workspace administran la instancia; Waby controla definición, políticas y provisioning técnico. |
 | Gestión de Knowledge (KB + documentos) | ✅ (API, autorización y fachada) | ✅ (persistencia y procesamiento) | Workspace es propietario; AI Service DB conserva la fuente de verdad de WorkspaceKnowledge/documentos; Qdrant es índice derivado y MinIO almacena binarios. |
 | Gestión de Skills/Rules por instancia | ✅ (permiso `wrk.agents.*`) | ❌ | Configuración empresarial dentro de allowlist y políticas Waby |
@@ -702,7 +706,7 @@ La propiedad de negocio, la superficie de API y la persistencia son dimensiones 
 
 | Operación | Autoridad | Límite |
 |---|---|---|
-| Crear, editar, versionar y retirar AgentDefinition | Waby | Solo catálogo central |
+| Crear, editar, activar, suspender y retirar AgentDefinition | Waby | Solo catálogo central; sin versiones publicadas |
 | Administrar proveedores, modelos y credenciales LLM | Waby | No configurable libremente por Workspace |
 | Administrar políticas obligatorias | Waby | No sobrescribibles por cliente ni LLM |
 | Provisioning técnico y purga física | Waby | Bajo política y auditoría |
@@ -743,7 +747,7 @@ La asignación inicial automática es una operación interna autenticada, valida
 
 | Operación | Waby | Workspace |
 |---|---|---|
-| AgentDefinition y catálogo central | Administra y publica | Solo consume definiciones publicadas |
+| AgentDefinition y catálogo central | Administra estados y configuración vigente | Solo consume definiciones activas; la identidad es estable y no hay versiones publicadas |
 | Proveedor/modelo/credenciales LLM | Administra exclusivamente | No configura credenciales ni parámetros técnicos libres |
 | Políticas obligatorias | Administra y aplica | No puede sobrescribirlas |
 | AgentInstance y configuración empresarial | Control de plataforma, políticas y provisioning técnico | Usuarios autorizados administran ciclo de vida lógico y configuración permitida |
@@ -850,12 +854,14 @@ Entrada (RabbitMQ / HTTP interno)
         ▼
 ┌─────────────────────────┐
 │ 3. Resolver instancia   │  Buscar AgentInstance por id + workspaceId.
-│    + verificar estado   │  status debe ser 'active'. Si no → rechazar.
+│    + verificar estados  │  AgentInstance y AgentDefinition deben estar 'active'.
+│                         │  AgentDefinition se resuelve por ID estable y se valida
+│                         │  su estado vigente antes de cada nueva ejecución.
 └─────────────────────────┘
         │
         ▼
 ┌─────────────────────────┐
-│ 4. Vigencia G1          │  AgentInstance activa, contacto no asignado a humano,
+│ 4. Vigencia G1          │  AgentInstance y AgentDefinition activas, contacto no asignado a humano,
 │    (fail-closed si      │    no hay cambio de asignación. Si MongoDB no
 │    MongoDB no está      │    está disponible o no es posible comprobar
 │    disponible)          │    la vigencia, no ejecutar respuestas ni
@@ -1623,7 +1629,7 @@ Cada ejecución genera `AgentExecution` + `AgentExecutionLog` con:
 
 **No se exponen modelos/versiones/parámetros al cliente** (I9, I21).
 
-**Nota de trazabilidad:** `prompt_snapshot_hash` identifica el prompt; `effective_config_hash` identifica la configuración completa. Ninguno permite reconstruir la ejecución por sí solo; para reproducibilidad completa se requiere `effective_config_snapshot` o las versiones inmutables de AgentDefinition, Rules y Skills referenciadas.
+**Nota de trazabilidad:** `prompt_snapshot_hash` identifica el prompt; `effective_config_hash` identifica la configuración completa. Ninguno permite reconstruir la ejecución por sí solo; para reproducibilidad completa se requiere `effective_config_snapshot`, que conserva la identidad estable y configuración efectiva capturada de AgentDefinition, junto con las referencias versionadas aplicables a Rules y Skills.
 
 ### G.6 Métricas por instancia y Organización (I20, P5)
 
@@ -1674,7 +1680,7 @@ Los desgloses por Workspace y AgentInstance son estadísticas y atribución. No 
 | aiCredential | Eliminado | Credenciales de proveedores LLM centralizadas en Waby |
 | enabledCapabilities | SkillConfiguration (por instancia) | Migrado como skills de la instancia |
 | knowledgeBaseIds | AgentInstance.knowledgeBaseIds | Referencias a WorkspaceKnowledge |
-| promptId / activePromptVersionId | AgentDefinition (prompt del sistema) | La definición lleva el prompt base |
+| promptId / activePromptVersionId | AgentDefinition (prompt del sistema) | La definición lleva el prompt base; cualquier versionado de PromptVersion no crea versiones publicadas de AgentDefinition |
 | status | AgentInstance.status | `active` / `inactive` → `active` / `suspended` |
 | temperature, maxIterations | AgentDefinition + AgentInstance override | Hiperparámetros centralizados en definición |
 
@@ -1884,14 +1890,14 @@ El trabajo se agrupa por responsabilidad arquitectónica (datos, provisioning, r
 
 ### ADR-005: Instantánea inmutable de configuración efectiva por ejecución (P10)
 
-**Estado:** Principio y referencias identificables/versionadas obligatorias por ejecución aprobados; política de publicación, ciclo de versionado/retención de Knowledge y detalles de persistencia pendientes.
+**Estado:** Principio de snapshot inmutable y trazabilidad por ejecución aprobados. AgentDefinition usa identidad estable sin versiones publicadas (D-W79-01); el versionado/retención de Knowledge y los detalles de persistencia se mantienen según sus contratos específicos.
 **Fecha de decisión:** 03/11/2026
-**Decisión:** Al comenzar cada ejecución, se crea una instantánea inmutable de la configuración efectiva (AgentDefinition versión activa, Rules, Skills, capabilities, knowledgeBaseIds y parámetros de ejecución de la AgentInstance). La ejecución en curso conserva sus definiciones hasta finalizar; los cambios posteriores se aplican únicamente a nuevas ejecuciones.
+**Decisión:** Al comenzar cada ejecución, se crea una instantánea inmutable de la configuración efectiva (AgentDefinition por ID estable y configuración vigente, Rules, Skills, capabilities, knowledgeBaseIds y parámetros de ejecución de la AgentInstance). La ejecución en curso conserva sus definiciones hasta finalizar; los cambios posteriores se aplican únicamente a nuevas ejecuciones. AgentDefinition no tiene versiones publicadas: sus cambios autorizados se propagan a todas las instancias vinculadas, y sus estados `suspended`/`retired` bloquean nuevas ejecuciones de todas ellas.
 
 Se definen **tres niveles de garantía** para trazabilidad y reproducibilidad:
 
 **Nivel 1 — Reconstrucción de configuración:**
-Permite conocer la configuración efectiva con la que se inició una ejecución. Incluye referencias identificables y versionadas de AgentDefinition, Rules, Skills y SkillConfiguration, capabilities, routing, provider/model y parámetros efectivos. Se conserva obligatoriamente en `effectiveConfigSnapshot`; `effectiveConfigHash` permite verificar su integridad.
+Permite conocer la configuración efectiva con la que se inició una ejecución. Incluye la identidad estable de AgentDefinition y la configuración efectiva capturada (verificable mediante hash), además de referencias identificables y versionadas de Rules, Skills y SkillConfiguration, capabilities, routing, provider/model y parámetros efectivos. No se exige ni se inventa una versión publicada de AgentDefinition. Se conserva obligatoriamente en `effectiveConfigSnapshot`; `effectiveConfigHash` permite verificar su integridad.
 
 **Nivel 2 — Trazabilidad del contexto:**
 Permite conocer qué información se utilizó durante la ejecución y es obligatorio por ejecución:
@@ -1912,10 +1918,10 @@ Permite intentar volver a ejecutar el proceso reconstruyendo el mismo contexto y
 **Consecuencias:**
 - Se definen dos hashes diferenciados:
   - `promptSnapshotHash` (SHA-256 del prompt efectivo construido) — identifica el prompt enviado al modelo.
-  - `effectiveConfigHash` (SHA-256 de la configuración efectiva completa: AgentDefinition.id+version, skill IDs+versiones, rule IDs+versiones, capability IDs, provider, modelo, parámetros) — identifica la configuración efectiva.
+  - `effectiveConfigHash` (SHA-256 de la configuración efectiva completa: AgentDefinition.id + valores efectivos capturados, skill IDs+versiones, rule IDs+versiones, capability IDs, provider, modelo y parámetros) — identifica la configuración efectiva.
 - Se almacena obligatoriamente `effectiveConfigSnapshot` (JSON sin secretos) con las referencias identificables/versionadas de configuración y Knowledge requeridas en los Niveles 1 y 2. La copia adicional de valores efectivos para reproducibilidad técnica (Nivel 3, P7) puede optimizarse por almacenamiento, sin eliminar las referencias obligatorias.
-- Las ejecuciones en curso no se ven afectadas por cambios de AgentDefinition, Rules, Skills o Knowledge mientras están en proceso.
-- Requiere almacenar por ejecución la versión de AgentDefinition, revisiones de Skills/SkillConfiguration y Rules, y las referencias versionadas de documentos y fragmentos Knowledge efectivamente utilizados.
+- Las ejecuciones en curso no se ven afectadas por cambios ordinarios de configuración de AgentDefinition, Rules, Skills o Knowledge mientras están en proceso. Un cambio de estado a `suspended` o `retired` bloquea nuevas ejecuciones asociadas; la cancelación de ejecuciones ya iniciadas requiere una política de seguridad explícita.
+- Requiere almacenar por ejecución la identidad estable y configuración efectiva capturada de AgentDefinition, revisiones de Skills/SkillConfiguration y Rules, y las referencias versionadas de documentos y fragmentos Knowledge efectivamente utilizados.
 - Sin flujo draft/release para el cliente (I17).
 - **Trazabilidad RAG (Nivel 2):** `knowledgeBaseIds` identifica las bases habilitadas, pero no el contenido efectivamente recuperado. Se registran obligatoriamente IDs de documentos y fragmentos de Qdrant, versiones disponibles y hashes de los fragmentos incorporados al contexto.
 - **No se incluyen secretos ni valores sensibles en el snapshot.** Las credenciales se referencian por ID de versión.
@@ -1961,9 +1967,9 @@ La secuencia y las dependencias operativas se consultan en Linear. No iniciar WA
 
 **Ruta canónica prevista:** `projects/agents-multitenant/design/fase-2-diseno-objetivo-y-contratos.md` en `sinies7ro/waby-docs`.
 
-**Estado de cierre documental (07/11/2026):** ARQ-14 y ARQ-22 tienen contrato de diseño documentado en D.1.9/B y D.6, respectivamente. La verificación cruzada entre inventario, diagramas, contratos, ADRs y los 15 escenarios D3 quedó completada documentalmente el 07/11/2026. Las pruebas de integración no se consideran ejecutadas. El diseño queda listo para revisión y autorización expresa del usuario; esta verificación no cierra WAB-78 por sí sola.
+**Estado de cierre documental (09/11/2026):** ARQ-14 y ARQ-22 tienen contrato de diseño documentado en D.1.9/B y D.6. La verificación cruzada entre inventario, diagramas, contratos, ADRs y los 15 escenarios D3 quedó completada documentalmente el 07/11/2026. La reconciliación adicional de D-W79-01 con DEC-CM-01/C9 y P10/C.7 quedó completada el 09/11/2026. Las pruebas de integración no se consideran ejecutadas. WAB-78 figura Done en Linear desde el 08/11/2026; WAB-79 permanece Backlog y no se ha iniciado formalmente.
 
-**Siguiente paso:** presentar el diseño completo al usuario para revisión y autorización expresa. WAB-78 permanece In Progress y WAB-79 no se inicia hasta esa autorización.
+**Siguiente paso:** iniciar WAB-79 únicamente mediante autorización explícita y respetando su alcance; D-W79-01 no reabre decisiones ya reconciliadas.
 
 ---
 *Documento de diseño exclusivamente. No se modifica código, schemas, colecciones, resolvers, endpoints ni infraestructura durante esta fase.*
