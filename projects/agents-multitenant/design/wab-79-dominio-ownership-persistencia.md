@@ -692,7 +692,7 @@ Si AI Service no está disponible o la proyección no alcanzó el último evento
 
 ### 16.12 Detalles pendientes de concreción técnica
 
-Sin reabrir las reglas aprobadas, quedan por definir: índices/clave exacta de idempotencia por contacto-operación y confirmación; schema final y ubicación del control de admisión; nombres definitivos, payloads y contratos de transporte Inbox/Outbox; propagación de sesión y topología MongoDB para atomicidad; y política independiente de retención/purga física. No se incorpora telemetría, dashboards ni nuevos registros de observabilidad, que están fuera del alcance. No se autoriza implementación ni cambios en Linear.
+Sin reabrir las reglas aprobadas, quedan por definir: índices/clave exacta de idempotencia por contacto-operación y confirmación; schema final y ubicación del control de admisión; nombres definitivos, payloads y contratos de transporte Inbox/Outbox; propagación de sesión y topología MongoDB para atomicidad; y política independiente de retención/purga física. No se autoriza implementación ni cambios en Linear.
 
 ---
 
