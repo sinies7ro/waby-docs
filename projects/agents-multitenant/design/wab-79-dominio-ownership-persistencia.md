@@ -567,4 +567,133 @@ Antes de iniciar la implementación de WAB-79, debe verificarse:
 - No se repitió la auditoría B1 ni se declararon índices aplicados en producción sin evidencia.
 - Se mantuvo separada la regla de dominio de su mecanismo técnico de implementación.
 
+
+
+## 16. Retiro coordinado de AgentInstance
+
+> **Estado:** Contrato de diseño aprobado en la sesión WAB-79 del 11/11/2026. No implica implementación. Este apartado concreta P9 y prevalece sobre formulaciones anteriores incompatibles con el retiro coordinado.
+
+### 16.1 Principios y lifecycle
+
+El retiro es lógico y coordinado; no equivale a eliminación física inmediata ni agrega un booleano `deleted`. La AgentInstance pasa a `retirement_pending` sólo después de confirmar durablemente ambos bloqueos: CRM impide nuevas asignaciones y el servicio propietario de ejecución impide nuevas ejecuciones. Al completar todas las verificaciones pasa a `retired`, estado terminal que conserva identidad y referencias históricas (EvAssigned y AgentExecution).
+
+La retención/purga de configuración, credenciales/conexiones, Knowledge, Skills, Rules, objetos MinIO e historiales tiene políticas independientes todavía no definidas. El retiro lógico no las elimina automáticamente.
+
+### 16.2 Doble bloqueo y recuperación
+
+CRM es autoridad de asignaciones y propietario único de `RetirementOperation`. El servicio de ejecución es autoridad de admisión de ejecuciones. No existe transacción distribuida entre ambos.
+
+La operación usa un `retirementOperationId` estable. Se solicitan los dos bloqueos; cada autoridad persiste y confirma durablemente el mismo ID. Sólo cuando ambas confirmaciones están persistidas se pasa a `releasing` y AgentInstance pasa a `retirement_pending`. Los bloqueos pueden existir antes del cambio de lifecycle. Una confirmación parcial mantiene la operación en `blocking` o `blocked`; no se agrega otro estado a AgentInstance.
+
+Solicitudes/reintentos son idempotentes. Ante respuesta perdida o recuperación, CRM consulta a cada autoridad por el mismo `retirementOperationId`; no infiere fallo por timeout ni crea otro ID. Si CRM o el servicio de ejecución no están disponibles, no se considera confirmado el bloqueo faltante.
+
+### 16.3 Estrategia y destino
+
+Cada operación define una única estrategia para todos los contactos: `unassign`, `reassign_user` a un usuario elegible del mismo Workspace, o `reassign_agent` a otra AgentInstance del mismo Workspace. El destino se valida al inicio; no se permite auto-reasignación. Estrategia y destino son inmutables.
+
+Si el destino B se vuelve inactivo después de iniciar A→B, la instrucción no cambia: se continúa intentando transferir a B, sin cambiarlo silenciosamente, crear una operación hija ni bloquear el resto por ese cambio. Los contactos ya transferidos permanecen en B. La garantía del retiro de A es que ninguno siga asignado a A al completar.
+
+### 16.4 Modelo conceptual de RetirementOperation
+
+CRM mantiene la única `RetirementOperation`; AI Service no persiste una copia de la operación de retiro. Campos conceptuales:
+
+| Campo | Semántica |
+|---|---|
+| `_id` | Identidad estable `retirementOperationId` |
+| `workspaceId`, `agentInstanceId` | Ámbito |
+| `actor` | `actorType` y `actorRef`, compatibles con EvAssigned |
+| `strategy` | Tipo y `destinationId`, inmutables |
+| `status`, `resumeFrom` | Estado y etapa de recuperación |
+| `blockedReason` | Código estable y detalles opcionales |
+| `lockConfirmations` | Confirmaciones durables CRM/servicio de ejecución y fecha |
+| `processing` | `leaseOwner`, `leaseUntil`, `leaseGeneration` |
+| `eventSetRevision`, `eventSetClosedAt` | Coordinación y cierre del conjunto esperado |
+| `lastProgressAt`, `attempts` | Progreso/reintentos |
+| `createdAt`, `updatedAt`, `completedAt` | Marcas temporales |
+
+Es un modelo conceptual, no un schema final listo para implementar.
+
+### 16.5 Estados e invariantes
+
+| Estado | Invariante |
+|---|---|
+| `requested` | Operación creada y destino validado; bloqueo aún no iniciado |
+| `blocking` | Solicita o recupera ambos bloqueos |
+| `releasing` | Ambos bloqueos confirmados; AgentInstance en `retirement_pending`; drenaje de contactos |
+| `finalizing` | Cero asignaciones actuales; conjunto de eventos cerrado; verifica ejecuciones y proyección |
+| `blocked` | Recuperable; conserva causa, progreso, bloqueos y `resumeFrom` |
+| `completed` | Todas las condiciones verificadas; terminal |
+
+Transiciones permitidas: `requested → blocking → releasing → finalizing → completed`; desde `blocking`, `releasing` o `finalizing` se puede pasar a `blocked`; `blocked` vuelve a la etapa indicada por `resumeFrom`. No hay `aborting` ni `aborted`; una vez iniciado el retiro no se cancela. `completed` no tiene salidas. AgentInstance pasa a `retired` sólo al completar la operación.
+
+Códigos estables de `blockedReason`: `CRM_LOCK_UNAVAILABLE`, `EXECUTION_LOCK_UNAVAILABLE`, `DESTINATION_INVALID` (al iniciar), `CONTACT_TRANSITION_CONFLICT`, `PROJECTION_NOT_CAUGHT_UP`, `PENDING_EXECUTIONS`; pueden llevar detalles opcionales. Fallos transitorios se reintentan con backoff; problemas permanentes requieren intervención administrativa. No se cambia destino automáticamente.
+
+### 16.6 Unicidad, lease y fencing
+
+Sólo puede existir una operación no terminal por AgentInstance. Se requiere índice único parcial conceptual sobre `agentInstanceId` para `requested`, `blocking`, `releasing`, `finalizing` y `blocked`; `completed` libera la unicidad. La creación es idempotente por `retirementOperationId`; una solicitud concurrente perdedora recibe conflicto y puede consultar la existente.
+
+Lease conceptual:
+```ts
+processing: {
+  leaseOwner: string | null,
+  leaseUntil: Date | null,
+  leaseGeneration: number
+}
+```
+Adquisición atómica; cada nueva adquisición efectiva incrementa generación; renovación conserva generación; lease vencido puede recuperarse. Toda escritura valida owner, generación y vigencia. Worker obsoleto no puede avanzar estado ni escribir progreso. Lease/fencing no reemplaza CAS ni idempotencia. La recuperación conserva estrategia, destino, bloqueos y transiciones confirmadas; consulta autoridades con el mismo ID, reanuda desde `resumeFrom` y no repite efectos confirmados. Contadores son informativos, no fuente de verdad.
+
+### 16.7 Admisión de ejecuciones
+
+La aceptación de ejecución y el bloqueo compiten atómicamente sobre el control durable de admisión:
+- Si gana la aceptación, se crea durablemente `AgentExecution` en `pending` con su `executionId`; debe terminar normalmente.
+- Si gana el bloqueo, la nueva ejecución se rechaza.
+- Reintentar el mismo `executionId` es idempotente.
+- No se cancelan automáticamente ejecuciones aceptadas antes del bloqueo.
+
+Campo conceptual:
+```ts
+executionAdmission: {
+  status: 'open' | 'blocked',
+  retirementOperationId: string | null,
+  blockedAt: Date | null
+}
+```
+La topología y transacción concretas deben garantizar la exclusión entre admisión y creación durable de AgentExecution; una lectura seguida de escritura separada no basta.
+
+### 16.8 Drenaje dinámico y CAS por contacto
+
+El worker consulta contactos que siguen asignados a A, toma un lote acotado, relee y procesa cada contacto individualmente, y vuelve a consultar el conjunto vivo hasta obtener cero. Después realiza verificación final independiente contra el estado autoritativo de CRM. No depende de cursor histórico ni de contadores.
+
+Cada transición valida mediante CAS la asignación actual a A y que `ref_ev_assigned` coincida con el evento previo esperado. Cada contacto se procesa en transacción MongoDB independiente con Contacto + EvAssigned + Outbox atómicos. Si otra transición válida ya movió o liberó el contacto, el retiro respeta el resultado, no duplica evento ni revierte la decisión.
+
+La regla lógica aprobada es como máximo una transición de retiro por contacto y operación. La clave exacta del índice y su convivencia con transiciones externas quedan para concreción técnica posterior.
+
+### 16.9 Correlación, causalidad y confirmación durable
+
+Toda transición válida que saque un contacto de A mientras el retiro de A esté activo queda correlacionada con ese `retirementOperationId`, aunque la inicie otro administrador/proceso. La correlación no altera `actorType`, `actorRef` ni `operationType`: reflejan al actor y operación reales. El conjunto esperado incluye tanto transiciones del worker como transiciones concurrentes externas que sacaron contactos de A.
+
+CRM obtiene los eventos esperados de los EvAssigned correlacionados, no de un preconteo ni de contadores. `SENT` en Outbox no significa aplicado.
+
+AI Service usa Inbox durable y cursor causal: aplica sólo cuando el cursor coincide con `previousEvAssignedId`; eventos futuros esperan al predecesor y eventos obsoletos no revierten la proyección. `lastProcessedEvAssignedId` conserva la última transición aplicada incluso tras liberar; la asignación activa queda nula al liberar.
+
+En una transacción local de AI Service, al aplicar cada evento: actualiza `contact_assignments`, avanza `lastProcessedEvAssignedId`, marca Inbox aplicado y crea confirmación durable en su Outbox. La confirmación significa aplicación real en la proyección, no recepción ni publicación. AI Service reintenta hasta que CRM la persista; CRM guarda confirmación idempotentemente por `evAssignedId` y la vincula a RetirementOperation.
+
+### 16.10 Cierre del conjunto esperado
+
+Mientras la operación esté en `releasing`, toda transición que saque un contacto de A escribe el mismo documento RetirementOperation en la misma transacción que Contacto, EvAssigned y Outbox, incrementando `eventSetRevision`. Esto incluye transiciones concurrentes externas.
+
+Para pasar a `finalizing`, una transacción valida estado `releasing`, lease/fencing vigente y cero contactos asignados a A; cierra el conjunto y registra `eventSetClosedAt`. Tanto el alta de eventos como el cierre escriben el mismo documento RetirementOperation. Una colisión debe abortar/reintentar y volver a validar. En `finalizing` el conjunto es inmutable; sólo pueden seguir llegando confirmaciones pendientes.
+
+### 16.11 Condiciones de finalización
+
+CRM sólo marca `completed` y AgentInstance `retired` cuando verifica: (1) cero contactos actualmente asignados a A; (2) ninguna AgentExecution aceptada pendiente o en procesamiento; (3) todos los EvAssigned del conjunto cerrado aplicados y confirmados durablemente por AI Service; (4) ningún evento causal pendiente de la operación en Inbox; y (5) confirmaciones persistidas por CRM para todos los eventos esperados. Se consulta el estado real, no contadores.
+
+Si AI Service no está disponible o la proyección no alcanzó el último evento, la operación permanece en `finalizing` o `blocked`, conserva bloqueos y reintenta. No se marca `retired` por timeout ni por Outbox `SENT`.
+
+### 16.12 Detalles pendientes de concreción técnica
+
+Sin reabrir las reglas aprobadas, quedan por definir: índices/clave exacta de idempotencia por contacto-operación y confirmación; schema final y ubicación del control de admisión; nombres definitivos, payloads y contratos de transporte Inbox/Outbox; propagación de sesión y topología MongoDB para atomicidad; y política independiente de retención/purga física. No se incorpora telemetría, dashboards ni nuevos registros de observabilidad, que están fuera del alcance. No se autoriza implementación ni cambios en Linear.
+
+---
+
 **Fin del documento.**
