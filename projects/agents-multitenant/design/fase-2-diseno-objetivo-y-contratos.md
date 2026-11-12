@@ -2573,3 +2573,33 @@ Eliminar referencias a un `lastFencingToken` global en `OrganizationAICredit` y 
 | Reconciliación | Hay procedimientos seguros para comparar contadores y resolver resultados externos inciertos. |
 
 Los criterios aquí descritos representan contratos de diseño, no evidencia de implementación. Su cumplimiento deberá verificarse mediante pruebas de integración y concurrencia en las fases correspondientes.
+
+
+## Anexo — Contrato de retiro de AgentInstance (reconciliación WAB-79, 11/11/2026)
+
+Este anexo complementa el lifecycle P9 y los contratos CRM/AI Service. El desarrollo normativo y el modelo conceptual completos están en [WAB-79 — Dominio, ownership y persistencia](./wab-79-dominio-ownership-persistencia.md), sección 16. No reabre decisiones previas.
+
+### A. Autoridad y doble bloqueo
+
+El retiro es lógico, no purga física. CRM es autoridad de asignaciones y propietario único de `RetirementOperation`; el servicio de ejecución es autoridad de admisión. Se usa un `retirementOperationId` estable. `retirement_pending` sólo se alcanza después de confirmación durable de CRM (bloqueo de nuevas asignaciones) y del servicio de ejecución (bloqueo de nuevas ejecuciones). No hay transacción distribuida; las confirmaciones y recuperaciones son idempotentes y consultables por el mismo ID.
+
+### B. Estrategia y ejecuciones aceptadas
+
+Una operación fija una estrategia y destino: `unassign`, `reassign_user` a un usuario del Workspace o `reassign_agent` a otra AgentInstance del Workspace. Destino validado al inicio e inmutable; su cambio de estado posterior no cambia la instrucción ni permite sustitución silenciosa.
+
+Admisión y bloqueo de ejecución compiten atómicamente: si gana aceptación, AgentExecution queda durablemente `pending` y debe terminar; si gana bloqueo, se rechaza la nueva. No se cancelan automáticamente ejecuciones aceptadas.
+
+### C. Transiciones y causalidad
+
+CRM drena mediante lotes dinámicos y CAS individual validando asignación actual y `ref_ev_assigned`. Contacto, EvAssigned y Outbox se confirman en transacción por contacto. Una transición concurrente válida que ya sacó el contacto de A se respeta, sin duplicar ni revertir.
+
+Toda transición que saque contactos de A mientras el retiro esté activo queda correlacionada al `retirementOperationId`, sin falsear actor/operación reales. El conjunto esperado se obtiene de EvAssigned correlacionados. AI Service aplica mediante Inbox durable y cursor `previousEvAssignedId` / `lastProcessedEvAssignedId`; en una transacción local actualiza proyección, cursor, Inbox y Outbox de confirmación. Confirmar significa aplicado, no recibido ni publicado; CRM persiste la confirmación idempotentemente por `evAssignedId`.
+
+### D. Cierre, recuperación y finalización
+
+Cada transición que añade un evento y el cierre del conjunto esperado escriben el mismo documento RetirementOperation en sus transacciones; `eventSetRevision` incrementa al agregar eventos. El paso `releasing → finalizing` verifica cero asignaciones, cierra el conjunto y registra `eventSetClosedAt`. Conflictos requieren abortar/reintentar y revalidar. En `finalizing` el conjunto queda inmutable.
+
+Sólo hay una operación no terminal por AgentInstance. La recuperación usa estado `blocked`, `resumeFrom`, códigos de bloqueo, lease y fencing; conserva estrategia, destino, bloqueos y efectos confirmados. Workers obsoletos no escriben con generación vencida.
+
+Se completa únicamente con cero asignaciones actuales, ninguna ejecución aceptada pendiente/en procesamiento, todos los eventos del conjunto cerrado aplicados y confirmados durablemente, y ningún evento causal pendiente en Inbox. Si AI Service no está disponible, se conservan bloqueos y la operación queda en finalización/bloqueada. `SENT` no equivale a aplicado. Los detalles exactos de schema, índices, transporte y retención física quedan para concreción técnica; no se autoriza implementación ni cambios en Linear.
+
