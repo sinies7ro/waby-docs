@@ -1,13 +1,45 @@
 # WAB-78 — Fase 2: Diseño objetivo y contratos
 
-> **Estado documental actualizado al 09/11/2026.** Este documento es el diseño integral de Fase 2 reconciliado con las decisiones aprobadas en Linear y la decisión D-W79-01. En caso de contradicción prevalecen ARQ-19/20/21, DEC-CM-01..08 y P4 aprobada. Los acuerdos conceptuales no implican implementación. WAB-78 figura Done en Linear desde el 08/11/2026; WAB-79 permanece Backlog y no se ha iniciado formalmente.
+> **Estado documental actualizado al 10/11/2026.** Este documento es el diseño integral de Fase 2 reconciliado con las decisiones aprobadas en Linear y las decisiones D-W79-01 a D-W79-17. En caso de contradicción prevalecen ARQ-19/20/21, DEC-CM-01..08 y P4 aprobada. Los acuerdos conceptuales no implican implementación. WAB-78 figura Done en Linear desde el 08/11/2026; WAB-79 constaba Backlog en el último estado documentado de Linear. La reconciliación documental D-W79-01..17 está completada; la implementación no se ha iniciado ni queda autorizada por este trabajo.
 >
 > **Cambios de vigencia:** P1 sustituye el cupo comercial antiguo y deja sin vigencia I3 en lo relativo a límites de cantidad; se retiraron las reglas antiguas de cupos 1/2 y downgrade, routing persistente canal→instancia, permisos `platform.*`/`bot.configure`/`wrk.agent.use`, y la autoridad exclusiva de Waby sobre el ciclo de vida lógico de AgentInstance. Ver el [registro de reconciliación](./reconciliacion-vigencia-fase-2-wab-78.md).
 
 
 **Padre:** WAB-75 · **Fase:** WAB-78 · **Estado:** Diseño completado (sin implementación) · **Fecha de creación:** 02/11/2026 · **Cierre en Linear:** 08/11/2026
 
-**Estado actual:** WAB-78 está Done en Linear. WAB-79 permanece Backlog y no se ha iniciado formalmente. Este documento define contratos de diseño; no implica autorización para modificar código, schemas, colecciones, resolvers, endpoints ni infraestructura.
+**Estado actual:** WAB-78 está Done en Linear. WAB-79 constaba Backlog en el último estado documentado de Linear; la reconciliación documental D-W79-01..17 está completada y su implementación no se ha iniciado. Este documento define contratos de diseño; no implica autorización para modificar código, schemas, colecciones, resolvers, endpoints ni infraestructura.
+
+**Criterio de sustitución del modelo legacy:** la implementación de IA basada en `Bot`/`BotInstance` nunca llegó a producción. El modelo objetivo `AgentDefinition`/`AgentInstance` la reemplazará directamente, sin migración de datos, backfill, cutover, rollback de datos ni compatibilidad funcional hacia atrás. Las reglas y configuraciones actuales de Bot (Rules, Skills, Knowledge, asignaciones, ejecuciones, routing y credenciales), así como los contratos y la documentación que las describen, deberán reemplazarse por los definidos en este documento y sus documentos canónicos relacionados. La documentación legacy se marcará como obsoleta o se archivará como antecedente no normativo; no debe seguir guiando implementación nueva. La retirada de código, modelos, endpoints, colecciones, configuraciones y pruebas sin uso forma parte de la limpieza del reemplazo, no de una migración de datos.
+
+La auditoría del código legacy tuvo como objetivo identificar elementos técnicos aprovechables y evitar repetir análisis, no preservar su dominio. Solo se consideran reutilizables, previa validación contra los contratos nuevos, patrones neutrales como Outbox/Change Streams/workers, transacciones y propagación de sesiones, almacenamiento MinIO con hashes/CAS, validación de paquetes Skill y conocimiento de cuotas por Workspace. Los modelos y contratos de dominio Bot/BotInstance/Execution, asignaciones autónomas de AI Service y reglas de negocio legacy no son base del modelo objetivo.
+
+**Reconciliación puntual con WAB-79 D-W79-02 (09/11/2026):** se explicita `Contacto.ref_ev_assigned` como referencia al último `EvAssigned` confirmado; `contact_assignments.evAssignedId` como metadata de la proyección (presente mientras la asignación está activa y null al liberar); y `AgentExecution.evAssignedId` como identidad obligatoria e inmutable de la transición que autorizó la ejecución. El envelope CRM → AI Service transporta ese identificador. El historial completo de `EvAssigned` permanece exclusivamente en CRM.
+
+**Reconciliación puntual con WAB-79 D-W79-03 (09/11/2026):** la configuración técnica del proveedor/modelo se encapsula en `LLMRoute`, administrada exclusivamente por Waby y persistida en AI Service DB. `AgentDefinition` referencia la ruta vigente mediante `llmRouteId`; no almacena proveedor/modelo/parámetros. `AgentInstance` no admite overrides técnicos. La revisión de LLMRoute y sus valores efectivos se capturan en el snapshot de cada ejecución. No existe fallback automático entre proveedores/modelos.
+
+**Reconciliación puntual con WAB-79 D-W79-04 (09/11/2026):** la proyección `contact_assignments` de AI Service utiliza `assignedType` con valores `human`/`agent`; `assigneeId` identifica al usuario o a la `AgentInstance`. La ausencia de una fila activa representa `unassigned`. Las filas liberadas conservan `assignedType` y `assigneeId` como referencia a la asignación cerrada y llevan `evAssignedId=null`. CRM conserva la autoridad y el historial completo de `EvAssigned`. Los valores legacy `user`/`bot` no requieren mapping de migración: la implementación anterior no llegó a producción y sus contratos se reemplazan.
+
+**Reconciliación puntual con WAB-79 D-W79-05 (09/11/2026):** `AgentExecution` se identifica por `executionId` y distingue aceptación durable (`createdAt`), primer inicio efectivo (`startedAt`) y terminación (`finishedAt`). Conserva los estados lógicos `pending`, `completed`, `failed` y `cancelled`; los estados de recepción, procesamiento y recuperación pertenecen a `AgentExecutionInbox`. `channel` e `input` son obligatorios. Provider/usage, latencia y costes son condicionales a datos realmente disponibles; la semántica financiera sigue en WAB-85.
+
+**Reconciliación puntual con WAB-79 D-W79-06 (09/11/2026):** `WorkspaceKnowledge` corresponde al modelo físico `KnowledgeBase` y a la colección `knowledge_bases`; `KnowledgeDocument` corresponde al modelo físico `Document` y a la colección `documents`. Ambos permanecen bajo autoridad/persistencia de AI Service DB, sin modelos o colecciones duplicados en CRM. Las cardinalidades son Workspace 1:N WorkspaceKnowledge y WorkspaceKnowledge 1:N KnowledgeDocument; cada documento pertenece a exactamente una KnowledgeBase mediante `knowledgeBaseId`.
+
+**Reconciliación puntual con WAB-79 D-W79-07 (09/11/2026):** la pertenencia `Document` ↔ `KnowledgeBase` ↔ `Workspace` se valida en escrituras, ingesta v1/v2 y consumer RabbitMQ; la recuperación RAG valida en lote que todas las KnowledgeBases solicitadas pertenecen al Workspace y aplica un filtro de metadata `workspaceId` obligatorio derivado del contexto; eliminación y reingesta verifican la coherencia antes de efectos sobre documentos/vectores. Toda inconsistencia se rechaza fail-closed. Las validaciones de referencias permanecen en capas de aplicación; no se introducen consultas de repositorio dentro de entidades de dominio.
+
+**Reconciliación puntual con WAB-79 D-W79-08 (09/11/2026):** el modelo legacy permitía a cada cliente seleccionar libremente un proveedor LLM y aportar su API key; `Bot.model`, `Bot.aiCredential` y el cifrador asociado pertenecen a ese modelo anterior y no forman parte del objetivo. En el modelo actual, Waby administra proveedores, cuentas/API keys, modelos, routing y parámetros técnicos. `AgentDefinition` referencia una `LLMRoute` mediante `llmRouteId`; ni `AgentDefinition` ni `LLMRoute` almacenan los secretos del proveedor. Las credenciales empresariales son administradas por usuarios autorizados del Workspace, pero su custodia segura y resolución corresponden a la plataforma Waby. La referencia protegida se mantiene en `AgentInstanceIntegration`, privada por defecto para una AgentInstance. `SkillConfiguration` no contiene `credentials` ni referencias directas a secretos; la asociación Skill–operación no se concreta en esta decisión. El mecanismo físico de almacenamiento/cifrado queda para diseño técnico posterior.
+
+**Reconciliación puntual con WAB-79 D-W79-09 (09/11/2026):** `SkillConfiguration` distingue el origen mediante `source` (`waby`/`workspace`), identifica al propietario mediante `ownerId` y al Skill mediante `skillId`; junto con `agentInstanceId` forman la identidad única `{agentInstanceId, source, ownerId, skillId}`. Para origen Waby, `ownerId` identifica a Waby; para origen Workspace, debe coincidir con `AgentInstance.workspaceId`. No se anticipan índices secundarios.
+
+**Reconciliación puntual con WAB-79 D-W79-10 (09/11/2026):** las Skills propias del Workspace no conservan historial de versiones ni rollback. Su contenido vigente se actualiza directamente; la frontera que fija el contenido de una ejecución es su aceptación durable (`createdAt`, antes del ack), no el primer procesamiento del worker (`startedAt`). Las ejecuciones aceptadas antes de una actualización mantienen su copia consistente durante su vida; las aceptadas después cargan el contenido vigente. P10 registra identidad y hash del contenido propio utilizado, pero no conserva su cuerpo histórico al finalizar ni permite recuperarlo. Las Skills estándar de Waby mantienen sus releases inmutables, identificadas por release/version en P10.
+
+**Reconciliación puntual con WAB-79 D-W79-11 (09/11/2026):** el Knowledge que Waby publique para incorporación por un Workspace se materializa, mediante una operación explícita de incorporación/materialización, como KnowledgeBase/Document dentro del ámbito de ese Workspace. La copia incorporada queda separada de la publicación central; sincronización, actualización y retirada de esa copia siguen pendientes de diseño. Esta regla específica no convierte la mera referencia a cualquier recurso Waby en una copia física automática.
+
+**Reconciliación puntual con WAB-79 D-W79-12 (10/11/2026):** `AgentRules` tiene identidad estable y contenido vigente único, sin campo `version`, historial ni rollback. Las modificaciones actualizan el recurso existente y afectan a nuevas ejecuciones aceptadas después del cambio. `AgentExecution.effectiveConfigSnapshot` conserva identidad, contenido y atributos efectivos de las Rules aplicadas; los snapshots aceptados son inmutables.
+
+**Reconciliación puntual con WAB-79 D-W79-13 (10/11/2026):** `AgentExecutionLog` queda diferido al diseño del módulo de observabilidad WABY y fuera del modelo objetivo actual. No se crea colección ni persistencia de eventos internos por ejecución. `AgentExecution` es el único registro persistente de dominio por ejecución y conserva estado, resultado, configuración efectiva y métricas consolidadas; logs y trazas se definirán en el diseño posterior.
+
+**Reconciliación puntual con WAB-79 D-W79-14 (10/11/2026):** `EvAssigned` reutiliza los campos heredados e índices existentes de `Evento`; no duplica `contacto` ni `assignedAt`. Sus campos propios son `prevAssignedType`, `prevAssignedRef`, `newAssignedType`, `newAssignedRef`, `actorType`, `actorRef`, `operationType` y `reason`. `actorRef` es obligatorio; `reason` admite null. `operationType` utiliza los seis valores aprobados. Se excluyen `originMessageId` y `delegationChainId` como campos de `EvAssigned`; `originMessageId` conserva su función independiente en el contrato de Inbox/mensajería.
+
+**Reconciliación puntual con WAB-79 D-W79-17 (10/11/2026):** los recursos se separan en dos ámbitos: catálogo central Waby y recursos personalizados propiedad de cada Workspace. Se utilizan espacios físicos MinIO separados y políticas de acceso diferenciadas; la decisión no exige despliegues MinIO independientes ni fija buckets/topología. Los recursos Waby no consumen cuotas de clientes. Cada Workspace conserva su propia cuota independiente; la Organización determina el plan del que pueden derivarse los límites, pero no existe una bolsa compartida entre sus Workspaces. Referenciar un recurso Waby no transfiere propiedad ni implica copia física automática. La materialización de Knowledge descrita en D-W79-11 es un flujo explícito y específico, no una regla general para todo recurso central.
 
 **Actualización aprobada (03/11/2026):** P4 quedó aprobada, incluida la política híbrida de facturación G.4.6 y un período de gracia de **30 días** para operaciones que permanezcan en `reconciliation_required` sin evidencia concluyente. Esta aprobación fue una decisión de alcance; el cierre posterior de WAB-78 se registró en Linear el 08/11/2026. No implica autorización para implementar WAB-79.
 
@@ -29,12 +61,13 @@ El diseño se basa en los hallazgos de la Fase 1 (WAB-77, [informe consolidado](
 
 La auditoría de Fase 1 confirmó que `Bot` mezcla definición + instancia. No hay entidad separada de definición. El modelo objetivo debe separar claramente qué es propiedad de Waby (definición) y qué es propiedad del Workspace (instancia).
 
-**Entidades actuales reutilizables:**
-- `Execution` → se conserva y amplía con campos de auditoría (I20, I21)
-- `KnowledgeBase` → se conserva como `WorkspaceKnowledge` (compartido por workspace, I11)
-- `Prompt` / `PromptVersion` → se reutilizan solo en lo que corresponda al almacenamiento del prompt; `AgentDefinition` conserva identidad estable y no tiene versiones publicadas.
-- `MemoryFact` → se reemplaza por `ConversationMemory` (ventana 20, I14)
-- `BotCredential` → se elimina; credenciales de proveedores LLM centralizadas en Waby (I6)
+**Elementos existentes evaluables como activos técnicos (no como continuidad del dominio legacy):**
+- `KnowledgeBase` → su modelo físico puede servir para `WorkspaceKnowledge` (compartido por Workspace, I11; D-W79-06), sujeto a verificar que sus campos y restricciones satisfagan el contrato nuevo.
+- `Document` → su modelo físico puede servir para `KnowledgeDocument` (pertenece a una KnowledgeBase; D-W79-06), sujeto a la misma validación.
+- Patrones de persistencia, repositorios, validaciones o infraestructura solo se conservan cuando satisfacen explícitamente el contrato objetivo.
+
+**No se preservan por continuidad:** `Execution` legacy no es la base del nuevo `AgentExecution`; `Prompt`/`PromptVersion` no implican versionado publicado de `AgentDefinition`; `MemoryFact` no se migra ni se adapta como contrato de `ConversationMemory`. Estos modelos, junto con `Bot`/`BotInstance` y sus reglas, se reemplazarán o retirarán durante la limpieza del legacy. La implementación anterior no llegó a producción, por lo que no existe requisito de migrar sus datos ni mantener compatibilidad hacia atrás.
+Las credenciales legacy asociadas a `BotCredential` también se retiran; las credenciales de proveedores LLM son centralizadas y administradas por Waby (I6).
 
 **Entidades nuevas requeridas:**
 - `AgentDefinition` (propiedad Waby)
@@ -42,7 +75,6 @@ La auditoría de Fase 1 confirmó que `Bot` mezcla definición + instancia. No h
 - `SkillConfiguration` (por instancia, I12)
 - `AgentRules` (por instancia, I13)
 - `ConversationMemory` (por conversación/instancia, I14)
-- `AgentExecutionLog` (auditoría por ejecución, I21)
 - `OrganizationAICredit` / `CreditLedger` (bolsa única por Organización, I17/I20)
 
 ### A.2 Entidades, responsabilidades y cardinalidades
@@ -55,11 +87,11 @@ EvAssigned es un discriminator de Evento en la colección eventos de CRM. Cada t
 
 **Compatibilidad histórica:** contactAssignmentHistory se conserva durante esta fase como artefacto/estructura legacy si está presente en los datos o modelos de origen. No se presupone su existencia en el código actual ni se lo considera fuente canónica de nuevas transiciones: ese rol corresponde a EvAssigned. No eliminarlo como parte de esta fase sin una decisión de migración explícita.
 
-**Proyección runtime:** contact_assignments en ai-service es una proyección derivada de ContactAssignment, sincronizada desde CRM. No es autoridad editable ni reemplaza la validación contra CRM en los checkpoints que exigen autoridad de dominio.
+**Proyección runtime:** `contact_assignments` en ai-service es una proyección derivada de ContactAssignment, sincronizada desde CRM. Utiliza `assignedType` (`human`/`agent`) y `assigneeId`; la ausencia de una fila activa representa `unassigned`. Al liberar, la fila conserva `assignedType`/`assigneeId`, cambia a `status='released'` y establece `evAssignedId=null`. No es autoridad editable ni reemplaza la validación contra CRM en los checkpoints que exigen autoridad de dominio. La proyección legacy se retira y se implementa el contrato objetivo sin conversión ni migración de valores `user`/`bot`, porque la implementación de IA anterior no llegó a producción (D-W79-04).
 
 
 #### AgentDefinition (Waby)
-Propiedad de la plataforma Waby. Representa la definición lógica de un agente: personalidad base, prompt del sistema, Skills/Rules por defecto, proveedor y modelo recomendados por Waby.
+Propiedad de la plataforma Waby. Representa la definición lógica de un agente: personalidad base, prompt del sistema, Skills/Rules por defecto y referencia a la ruta técnica de proveedor/modelo administrada por Waby mediante `LLMRoute`.
 
 | Campo | Tipo | Obligatorio | Descripción |
 |-------|------|-------------|-------------|
@@ -67,13 +99,7 @@ Propiedad de la plataforma Waby. Representa la definición lógica de un agente:
 | name | String | Sí | Nombre de la definición |
 | description | String | No | Descripción |
 | systemPrompt | String | Sí | Prompt base del sistema |
-| provider | Enum | Sí | Proveedor LLM (openai, openrouter, nvidia, gemini) |
-| model | String | Sí | Modelo LLM |
-| temperature | Decimal | No | Temperatura (default 0.7) |
-| maxTokens | Integer | No | Tokens máximos (default 4096) |
-| topP | Decimal | No | Top-p (default 1) |
-| frequencyPenalty | Decimal | No | Penalidad de frecuencia (default 0) |
-| presencePenalty | Decimal | No | Penalidad de presencia (default 0) |
+| llmRouteId | UUID | Sí | Referencia a una `LLMRoute` administrada por Waby; define proveedor, modelo y parámetros técnicos efectivos |
 | defaultSkills | JSON[] | No | Plantilla inicial de Skills que se copia a la nueva AgentInstance al crearla; no se hereda dinámicamente |
 | defaultRules | JSON[] | No | Plantilla inicial de Rules que se copia a la nueva AgentInstance al crearla; no se hereda dinámicamente |
 | status | Enum | Sí | `draft` / `active` / `suspended` / `retired` |
@@ -86,10 +112,36 @@ Propiedad de la plataforma Waby. Representa la definición lógica de un agente:
 
 **Cardinalidad:** Una AgentDefinition puede tener cero o más AgentInstance asociadas (1:N, sin unicidad workspaceId+agentDefinitionId per I16).
 
-**Inicialización de AgentInstance:** al crear una instancia, `defaultSkills` y `defaultRules` vigentes en AgentDefinition se copian como configuración inicial en sus `SkillConfiguration` y `AgentRules`. Son plantillas de inicialización, no herencia dinámica: una vez copiadas, Skills y Rules continúan siendo configuración propia de cada AgentInstance. Los cambios posteriores en el prompt base, proveedor/modelo y demás configuración central vigente de AgentDefinition sí se aplican a todas las instancias vinculadas en nuevas ejecuciones. Cada Workspace administra la configuración permitida de Skills/Rules de su instancia, sujeta a las políticas Waby.
+**Inicialización de AgentInstance:** al crear una instancia, `defaultSkills` (solo Skills del catálogo central Waby, identificadas con `source=waby` y `ownerId` de Waby) y `defaultRules` vigentes en AgentDefinition se copian como configuración inicial en sus `SkillConfiguration` y `AgentRules`. Son plantillas de inicialización, no herencia dinámica: una vez copiadas, Skills y Rules continúan siendo configuración propia de cada AgentInstance. Los usuarios autorizados del Workspace pueden agregar Skills propias (`source=workspace`, `ownerId=workspaceId`) de forma independiente. Los cambios posteriores en el prompt base y demás configuración funcional vigente de AgentDefinition se aplican a todas las instancias vinculadas en nuevas ejecuciones. Los cambios en la revisión vigente de la LLMRoute referenciada también se aplican a esas nuevas ejecuciones; ninguna de las dos modificaciones altera los snapshots ya iniciados. Cada Workspace administra la configuración permitida de Skills/Rules de su instancia, sujeta a las políticas Waby.
+
+#### LLMRoute (Waby)
+
+Entidad independiente administrada exclusivamente por Waby. Encapsula la selección técnica del proveedor, modelo y parámetros permitidos. Se persiste en AI Service DB y puede ser reutilizada por varias AgentDefinitions.
+
+| Campo | Tipo | Obligatorio | Descripción |
+|-------|------|-------------|-------------|
+| id | UUID | Sí | Identificador único de la ruta |
+| name | String | Sí | Nombre interno administrado por Waby |
+| provider | Enum | Sí | Proveedor LLM (`openai`, `openrouter`, `nvidia`, `gemini`) |
+| model | String | Sí | Modelo seleccionado por Waby |
+| temperature | Decimal | No | Parámetro permitido (default 0.7) |
+| maxTokens | Integer | No | Parámetro permitido (default 4096) |
+| topP | Decimal | No | Parámetro permitido (default 1) |
+| frequencyPenalty | Decimal | No | Parámetro permitido (default 0) |
+| presencePenalty | Decimal | No | Parámetro permitido (default 0) |
+| version | Integer | Sí | Revisión de configuración; aumenta ante cada cambio material de proveedor, modelo o parámetros |
+| createdAt | Timestamp | Sí | Fecha de creación |
+| updatedAt | Timestamp | Sí | Fecha de última actualización |
+
+**Reglas de LLMRoute:**
+- Una AgentDefinition referencia exactamente una LLMRoute mediante `llmRouteId`; una LLMRoute puede ser compartida por varias AgentDefinitions. `llmRouteId` identifica la ruta lógica estable; `version` identifica la revisión vigente de su configuración, sin crear versiones publicadas de AgentDefinition.
+- La allowlist de parámetros es controlada por Waby. El conjunto inicial comprende `temperature`, `maxTokens`, `topP`, `frequencyPenalty` y `presencePenalty`; todo parámetro adicional requiere incorporación explícita y validación de soporte en el adaptador del proveedor. No existe allowlist de overrides técnicos por AgentInstance.
+- No se aceptan objetos arbitrarios de configuración nativa del proveedor. Las credenciales permanecen en el almacén seguro administrado por Waby; LLMRoute y los snapshots no contienen secretos.
+- Cada cambio material de proveedor/modelo/parámetros incrementa `LLMRoute.version`. Las nuevas ejecuciones resuelven la última revisión vigente y capturan `llmRouteId`, `version` y los valores efectivos. No se alteran snapshots de ejecuciones ya iniciadas.
+- No se establece fallback automático entre proveedores o modelos. Los errores de la ruta siguen la política explícita de errores/reintentos, sin cambiar de proveedor de forma implícita.
 
 #### AgentInstance (Workspace)
-Propiedad de un Workspace. Representa una instancia ejecutable de una AgentDefinition asignada a un Workspace específico.
+Propiedad de un Workspace. Representa una instancia ejecutable de una AgentDefinition asignada a un Workspace específico. No puede sobrescribir `llmRouteId`, proveedor, modelo ni parámetros técnicos de LLMRoute.
 
 | Campo | Tipo | Obligatorio | Descripción |
 |-------|------|-------------|-------------|
@@ -114,38 +166,67 @@ Propiedad de un Workspace. Representa una instancia ejecutable de una AgentDefin
 
 **Cardinalidad:** Una AgentInstance pertenece a exactamente un Workspace (N:1). Un Workspace puede tener múltiples AgentInstance; no existe cupo comercial por plan.
 
+#### WorkspaceKnowledge y KnowledgeDocument (Workspace)
+
+El dominio utiliza los nombres `WorkspaceKnowledge` y `KnowledgeDocument`; se conservan los modelos y colecciones físicas existentes en AI Service DB, sin renombrado ni persistencia paralela:
+
+| Concepto de dominio | Modelo físico | Colección | Persistencia |
+|---|---|---|---|
+| `WorkspaceKnowledge` | `KnowledgeBase` | `knowledge_bases` | AI Service DB |
+| `KnowledgeDocument` | `Document` | `documents` | AI Service DB |
+
+**Cardinalidades y referencias:**
+- Un Workspace puede tener cero o más `WorkspaceKnowledge` (1:N); cada `WorkspaceKnowledge` pertenece a exactamente un Workspace.
+- Una `WorkspaceKnowledge` puede contener cero o más `KnowledgeDocument` (1:N); cada `KnowledgeDocument` pertenece a exactamente una `WorkspaceKnowledge`, identificada por `knowledgeBaseId`.
+- `Document.workspaceId` se conserva como atributo de alcance/filtrado tenant y debe corresponder al `workspaceId` de la `KnowledgeBase` referenciada (D-W79-06/07).
+- Toda escritura/actualización de Document valida la KnowledgeBase por identidad y Workspace. Ingesta v1/v2 y consumers RabbitMQ validan que el `knowledgeBaseId` del contexto/mensaje coincide con el documento persistido y que la KnowledgeBase pertenece al mismo Workspace.
+- Antes de eliminar o reingerir un documento se comprueba la coherencia de la referencia antes de purgar o escribir vectores. Las inconsistencias detienen los efectos y requieren reconciliación.
+- La recuperación RAG valida en lote que todos los `knowledgeBaseIds` solicitados existen y pertenecen al Workspace. Si falta algún ID o corresponde a otro Workspace, se rechaza la consulta completa.
+- Todo filtro vectorial incluye obligatoriamente `workspaceId` derivado del contexto validado; ningún caller puede omitirlo ni reemplazarlo. El namespace de colección Qdrant es defensa adicional, no reemplazo de la validación de pertenencia.
+- Las validaciones de referencias se realizan en casos de uso/servicios de aplicación, no dentro de entidades o value objects. Ante una inconsistencia se rechaza fail-closed, sin continuar con ingesta, recuperación o efectos destructivos.
+- Knowledge es propiedad del Workspace y puede ser utilizado/compartido por sus AgentInstances mediante `knowledgeBaseIds`; no pertenece a una AgentInstance.
+- CRM conserva la superficie de API y valida los permisos/ownership de Workspace; AI Service mantiene la persistencia fuente de verdad y realiza la ingestión. No se crean entidades editables duplicadas en CRM.
+- Los binarios permanecen en MinIO y los chunks/embeddings/índices vectoriales son artefactos derivados reconstruibles, conforme a D.1.9.
+
 #### AgentExecution
 Ejecución individual de un agente para procesar un mensaje de usuario.
 
 | Campo | Tipo | Obligatorio | Descripción |
 |-------|------|-------------|-------------|
-| id | UUID | Sí | Identificador único (execution_id, idempotency key) |
+| id | UUID | Sí | Identidad única `executionId` e idempotency key |
 | organizationId | String | Sí | Organización propietaria del saldo consumido |
 | workspaceId | String | Sí | Workspace asociado (dimensión de atribución) |
 | agentInstanceId | UUID | Sí | Instancia que atendió la ejecución |
+| agentDefinitionId | UUID | Sí | Identidad estable de AgentDefinition utilizada |
 | conversationId | String | Sí | Conversación de origen |
 | contactId | String | Sí | Contacto de origen |
+| evAssignedId | String / UUID | Sí | Identidad del `EvAssigned` que autorizó esta ejecución; se conserva inmutable durante toda la ejecución |
 | channel | String | Sí | Canal de entrada |
-| input | String | Sí | Mensaje de entrada |
+| input | String | Sí | Mensaje de entrada normalizado |
 | promptSnapshotHash | String | Sí | SHA-256 del prompt efectivo construido (I21, P7) |
-| effectiveConfigHash | String | Sí | SHA-256 de la configuración efectiva completa (AgentDefinition, Rules, Skills, capabilities, provider, modelo, routing, parámetros) (P10) |
-| effectiveConfigSnapshot | JSON | Sí | Snapshot inmutable sin secretos. Incluye identidad estable y configuración efectiva capturada de AgentDefinition, más referencias identificables y versionadas de Skills y SkillConfiguration, Rules, capabilities, Knowledge Bases, documentos y fragmentos incorporados al contexto; puede incluir valores efectivos adicionales para reproducibilidad técnica (P7, P10) |
-| providerModelUsed | String | Sí | Proveedor y modelo realmente usado (I21) |
-| inputTokens | Integer | Sí | Tokens de entrada |
-| outputTokens | Integer | Sí | Tokens de salida |
-| totalTokens | Integer | Sí | Total de tokens |
-| totalCreditsDeducted | Decimal | Sí | Créditos descontados (I20) |
-| currency | String | Sí | Moneda (default USD) |
-| latencyMs | Integer | Sí | Latencia de ejecución (I21) |
-| status | Enum | Sí | `pending` / `completed` / `failed` / `cancelled` |
-| error | String | No | Mensaje de error si falló |
-| startedAt | Timestamp | Sí | Fecha de inicio |
-| completedAt | Timestamp | No | Fecha de completación |
-| correlationData | JSON | Sí | traceId, executionId, correlationId |
+| effectiveConfigHash | String | Sí | SHA-256 de la configuración efectiva completa: identidad estable de AgentDefinition, `llmRouteId` + `LLMRoute.version`, proveedor/modelo/parámetros efectivos, identidad de Skills (`source`/`ownerId`/`skillId`) con release para Waby o hash para Workspace, Rules, capabilities y demás configuración aplicable (P10) |
+| effectiveConfigSnapshot | JSON | Sí | Snapshot inmutable sin secretos, capturado al aceptar duraderamente la ejecución antes del ack de entrada. Incluye identidad estable de AgentDefinition, `llmRouteId` + `LLMRoute.version`, proveedor/modelo/parámetros técnicos efectivos y referencias de Skills según origen: release inmutable para Skills Waby; `source`/`ownerId`/`skillId` y hash del contenido vigente para Skills propias de Workspace, sin cuerpo histórico ni versión recuperable. Incluye configuración efectiva de SkillConfiguration, Rules, capabilities, Knowledge Bases, documentos y fragmentos incorporados al contexto (P7, P10) |
+| providerModelUsed | String \| null | Condicional | Proveedor/modelo realmente invocado; null si no hubo invocación LLM |
+| inputTokens | Integer \| null | Condicional | Usage de entrada informado por el proveedor; no inventar cero ante ausencia de dato |
+| outputTokens | Integer \| null | Condicional | Usage de salida informado por el proveedor; no inventar cero ante ausencia de dato |
+| totalTokens | Integer \| null | Condicional | Suma de inputTokens y outputTokens cuando ambos están disponibles |
+| totalCreditsDeducted | Decimal \| null | Condicional; semántica WAB-85 | Importe liquidado/atribuible; no es autoridad financiera |
+| currency | String \| null | Condicional junto al importe; semántica WAB-85 | Moneda/unidad aplicable |
+| latencyMs | Integer \| null | Condicional | Duración entre startedAt y finishedAt cuando ambos existen |
+| status | Enum | Sí | `pending` / `completed` / `failed` / `cancelled`; estado lógico, sin estado `running` |
+| error | String \| null | Condicional | Error sanitizado si falla; sin secretos ni credenciales |
+| createdAt | Timestamp | Sí | Momento de aceptación y persistencia durable de la ejecución |
+| startedAt | Timestamp \| null | Condicional | Primer inicio efectivo del procesamiento; null hasta que comienza un worker |
+| finishedAt | Timestamp \| null | Condicional | Instante de terminación; obligatorio en estados `completed`, `failed` o `cancelled` |
+| correlationData | JSON | Sí | traceId, executionId (igual a id), correlationId |
 
 **Cardinalidad:** Una AgentExecution pertenece a una AgentInstance (N:1), a un Workspace (N:1) y a una Organización (N:1). Una AgentInstance puede tener cero o más AgentExecution (1:N). `organizationId` debe coincidir con la Organización a la que pertenece el Workspace; no se confía en un organizationId recibido libremente en mensajes RabbitMQ o solicitudes internas.
 
-**Nota de trazabilidad:** `prompt_snapshot_hash` identifica el prompt efectivo; `effective_config_hash` identifica el conjunto completo de configuración efectiva. Ninguno de estos hashes permite reconstruir la ejecución por sí solo; para reproducibilidad completa se requiere `effective_config_snapshot`, que conserva la identidad estable y configuración efectiva capturada de AgentDefinition, además de las referencias versionadas aplicables a Rules y Skills.
+**Semántica temporal y de estado (D-W79-05):** `createdAt` registra la aceptación durable de la ejecución lógica; en ese mismo punto se persisten los hashes y el snapshot inmutable antes de confirmar el mensaje de entrada (D.6.4). `startedAt` se establece cuando comienza el procesamiento efectivo y puede ser null si la ejecución termina antes de iniciar un worker. `finishedAt` es obligatorio al pasar a `completed`, `failed` o `cancelled`; si existe `startedAt`, debe ser posterior o igual. `latencyMs` solo se calcula cuando ambos timestamps existen. Una recuperación conserva el mismo `executionId` y el primer `startedAt`.
+
+`AgentExecution.status` representa el estado lógico y no incorpora `running`. La recepción durable, los estados de procesamiento, leases, recuperación y deduplicación pertenecen a `AgentExecutionInbox` y al contrato de D.6/WAB-81. `originMessageId` se mantiene en el contrato de Inbox y no se duplica como campo independiente en AgentExecution. Los valores de provider/usage permanecen null si no se invocó proveedor o no se recibió usage; la ausencia de información no se representa como cero. Los costes atribuidos siguen sujetos a WAB-85 y al ledger CRM.
+
+**Nota de trazabilidad:** `prompt_snapshot_hash` identifica el prompt efectivo; `effective_config_hash` identifica el conjunto completo de configuración efectiva. Ninguno de estos hashes permite reconstruir la ejecución por sí solo; `effective_config_snapshot` conserva la identidad estable y configuración efectiva capturada de AgentDefinition, además de referencias versionadas de Rules y Skills Waby, e identidad/hash para Skills propias de Workspace conforme a D-W79-10.
 
 #### WorkspaceKnowledge
 Knowledge perteneciente al Workspace, compartido por todas sus AgentInstance (I11).
@@ -167,6 +248,8 @@ Knowledge perteneciente al Workspace, compartido por todas sus AgentInstance (I1
 
 **Cardinalidad:** Un Workspace puede tener cero o más WorkspaceKnowledge (1:N). Todas las AgentInstance del mismo Workspace comparten los mismos WorkspaceKnowledge (I11).
 
+**Incorporación de Knowledge publicado por Waby (D-W79-11):** cuando un Workspace incorpora contenido publicado por Waby, ese contenido se materializa como una KnowledgeBase y sus Documents dentro del ámbito del Workspace en AI Service DB. La publicación central y la copia incorporada son recursos separados; no se crea una referencia que permita a una instancia consultar directamente el Knowledge privado/central de Waby. La sincronización, actualización, obsolescencia y retirada de la copia materializada quedan pendientes de diseño.
+
 #### SkillConfiguration
 Skills pertenecientes individualmente a cada AgentInstance (I12). Sin herencia ni compartición implícita.
 
@@ -174,15 +257,24 @@ Skills pertenecientes individualmente a cada AgentInstance (I12). Sin herencia n
 |-------|------|-------------|-------------|
 | id | UUID | Sí | Identificador único |
 | agentInstanceId | UUID | Sí | Instancia propietaria |
-| skillId | String | Sí | Identificador de la skill (catálogo Waby) |
+| source | Enum | Sí | Origen: `waby` o `workspace` |
+| ownerId | UUID/String | Sí | Propietario del Skill: identidad Waby o `workspaceId` de la instancia |
+| skillId | String | Sí | Identidad estable del Skill dentro de su propietario |
 | skillName | String | Sí | Nombre de la skill |
 | enabled | Boolean | Sí | Si la skill está habilitada para esta instancia |
 | config | JSON | No | Configuración específica de la skill para esta instancia |
-| credentials | JSON | No | Referencias (IDs) a credenciales de integraciones empresariales configuradas y administradas por el Workspace; no almacena secretos ni credenciales LLM. Los secretos se gestionan mediante el mecanismo seguro de credenciales de la plataforma. |
 | createdAt | Timestamp | Sí | Fecha de creación |
 | updatedAt | Timestamp | Sí | Fecha de última actualización |
 
 **Cardinalidad:** Una AgentInstance puede tener cero o más SkillConfiguration (1:N). Una SkillConfiguration pertenece a exactamente una AgentInstance (N:1).
+
+**Identidad y unicidad (D-W79-09):** la combinación `{agentInstanceId, source, ownerId, skillId}` es inmutable y única. El índice único propuesto es `{agentInstanceId: 1, source: 1, ownerId: 1, skillId: 1}`; no se agregan índices secundarios hasta que una consulta runtime concreta los justifique. `ownerId` debe corresponder a Waby cuando `source=waby` y al `workspaceId` de la instancia cuando `source=workspace`.
+
+**Ciclo de vida (D-W79-10):** los Skills propios del Workspace tienen un único contenido vigente, sin historial ni rollback. Cada ejecución usa una copia consistente cargada al comenzar; una actualización solo afecta ejecuciones posteriores. El snapshot persistido conserva el hash del contenido propio utilizado, no el cuerpo histórico. El contenido cargado permanece disponible en el contexto de ejecución hasta que esta termine, sin que ello cree una versión histórica recuperable.
+
+**Origen y contenido:** `source`/`ownerId`/`skillId` identifican el recurso fuente y su propietario. La ubicación física/entidad autoritativa que almacena el contenido fuente de Skills propias del Workspace y su relación con esta configuración permanecen pendientes de definición antes de implementar; no se asume que el cuerpo del Skill se almacene dentro de `SkillConfiguration`.
+
+**Límite de credenciales (D-W79-08):** `SkillConfiguration` define configuración y habilitación de la Skill; no almacena secretos ni referencias directas a credenciales empresariales. La referencia protegida a la credencial de una conexión pertenece a `AgentInstanceIntegration`. La relación exacta entre una Skill y las operaciones/capacidades de integración que puede utilizar se mantiene como contrato operativo separado; no se introduce aquí un campo de credenciales ni se fija su cardinalidad.
 
 #### AgentRules
 Rules pertenecientes individualmente a cada AgentInstance (I13). Personalidad, tono, instrucciones y restricciones independientes por instancia.
@@ -195,11 +287,13 @@ Rules pertenecientes individualmente a cada AgentInstance (I13). Personalidad, t
 | content | String | Sí | Contenido de la regla |
 | priority | Integer | No | Prioridad de aplicación de la regla |
 | enabled | Boolean | Sí | Si la regla está habilitada para esta instancia |
-| version | Integer | Sí | Versión de la regla |
+
 | createdAt | Timestamp | Sí | Fecha de creación |
 | updatedAt | Timestamp | Sí | Fecha de última actualización |
 
 **Cardinalidad:** Una AgentInstance puede tener cero o más AgentRules (1:N). Una AgentRules pertenece a exactamente una AgentInstance (N:1).
+
+**D-W79-12 — identidad y ciclo de vida:** cada AgentRules conserva identidad estable y un único contenido vigente. No existe campo `version`, historial de versiones ni rollback. Las modificaciones actualizan el recurso existente y afectan a nuevas ejecuciones aceptadas después del cambio. `AgentExecution.effectiveConfigSnapshot` conserva identidad, contenido y atributos efectivos de las Rules aplicadas; los snapshots de ejecuciones aceptadas son inmutables.
 
 #### ConversationMemory
 Memoria operativa por conversación, asociada a AgentInstance. Solo mensajes `user`/`assistant`, máximo 20, sin resumen automático (I14).
@@ -218,27 +312,9 @@ Memoria operativa por conversación, asociada a AgentInstance. Solo mensajes `us
 
 **Cardinalidad:** Una ConversationMemory pertenece a una AgentInstance y una conversación (N:1:N). Una conversación tiene exactamente una ConversationMemory por AgentInstance.
 
-#### AgentExecutionLog
-Log de auditoría técnica por ejecución (I21). Registra eventos y detalles cronológicos vinculados a `AgentExecution`; no sustituye `AgentExecution.effectiveConfigSnapshot`, que es la fuente de verdad de las referencias inmutables de configuración y Knowledge de P10. Sin exponer modelos/versiones/parámetros al cliente.
+#### Observabilidad de ejecuciones — diferida (D-W79-13)
 
-| Campo | Tipo | Obligatorio | Descripción |
-|-------|------|-------------|-------------|
-| id | UUID | Sí | Identificador único |
-| executionId | UUID | Sí | Referencia a AgentExecution |
-| agentInstanceId | UUID | Sí | Instancia ejecutora |
-| workspaceId | String | Sí | Workspace asociado |
-| eventType | Enum | Sí | `execution_started` / `execution_completed` / `execution_failed` / `execution_cancelled` / `credits_deducted` |
-| promptSnapshotHash | String | Sí | Hash del prompt usado |
-| providerModelUsed | String | Sí | Proveedor y modelo usado |
-| inputTokens | Integer | Sí | Tokens de entrada |
-| outputTokens | Integer | Sí | Tokens de salida |
-| totalCreditsDeducted | Decimal | Sí | Créditos descontados en este evento |
-| latencyMs | Integer | Sí | Latencia en ms |
-| result | String | No | Resultado normalizado (sin detalles internos) |
-| error | String | No | Error si falló |
-| createdAt | Timestamp | Sí | Timestamp del evento |
-
-**Cardinalidad:** Una AgentExecution puede tener cero o más AgentExecutionLog (1:N).
+No se define una entidad `AgentExecutionLog`, una colección ni persistencia de eventos internos por ejecución en el modelo objetivo actual. `AgentExecution` es el único registro persistente de dominio por ejecución y conserva estado, resultado, configuración efectiva y métricas consolidadas. El futuro módulo de observabilidad decidirá si necesita logs, trazas o eventos técnicos, además de su almacenamiento, retención y correlación.
 
 #### OrganizationAICredit
 Bolsa única de créditos por Organización (I17, I20). Saldo acumulado compartido por todos los Workspaces de la Organización. Una Organización tiene exactamente una OrganizationAICredit.
@@ -350,13 +426,16 @@ Registro append-only de movimientos de créditos (P4). Idempotente por combinaci
 
 ```
 WABY (PLATAFORMA)
+  LLMRoute (Waby; AI Service DB)
+       ^ 1:N
+       |
   AgentDefinition
        │ 1:N
        ▼
 WORKSPACE
   AgentInstance ───────────── AgentExecution
        │                           │
-       ├── SkillConfiguration      └── AgentExecutionLog
+       ├── SkillConfiguration
        ├── AgentRules
        ├── ConversationMemory
        └── WorkspaceKnowledge (compartido por las instancias del Workspace)
@@ -388,13 +467,13 @@ AI SERVICE — MENSAJERÍA ASÍNCRONA
 
 | Capa / dominio | Entidades | Propietario de negocio | Persistencia fuente de verdad |
 |---|---|---|---|
-| Waby (plataforma) | AgentDefinition y Prompt/PromptVersion asociados | Waby | AI Service DB, bajo control exclusivo Waby |
+| Waby (plataforma) | AgentDefinition, LLMRoute y Prompt/PromptVersion asociados | Waby | AI Service DB, bajo control exclusivo Waby |
 | Workspace | AgentInstance | Workspace | CRM DB |
 | Workspace | WorkspaceKnowledge y metadatos de documentos | Workspace | AI Service DB; binarios en MinIO y vectores/índice derivados en Qdrant |
 | Organización | OrganizationAICredit, CreditLedger, ExecutionBudgetAuthorization, ExecutionBudgetAllocation | Organización | CRM DB |
 | AgentInstance | SkillConfiguration, AgentRules | AgentInstance | CRM DB |
 | Conversación | ConversationMemory | AgentInstance + conversación | AI Service DB |
-| Ejecución | AgentExecution, AgentExecutionLog | AgentInstance + Workspace | AI Service DB |
+| Ejecución | AgentExecution | AgentInstance + Workspace | AI Service DB; observabilidad técnica diferida por D-W79-13 |
 | Asignaciones CRM | Contacto/ContactAssignment, EvAssigned y Outbox de asignación | CRM | CRM DB |
 | Proyección runtime | contact_assignments | Derivado de ContactAssignment CRM | AI Service DB; reconstruible desde CRM |
 | Outbox de mensaje de origen CRM → AI Service (AgentMessageOutbox) | CRM | CRM | CRM DB | Mensaje de origen e intención de despacho se escriben en una misma unidad atómica; distinto del Outbox de asignación de D.1.8. |
@@ -476,15 +555,15 @@ La suspensión no equivale al retiro ni a la purga física. La eliminación de u
 
 ### C.7 Consistencia de configuración (P10) — Instantánea inmutable por ejecución y trazabilidad
 
-**Mecanismo aprobado (P10):** instantánea inmutable de configuración efectiva al comenzar cada ejecución.
+**Mecanismo aprobado (P10):** instantánea inmutable de configuración efectiva al aceptar duraderamente cada ejecución lógica, antes del ack de entrada; `startedAt` identifica el inicio efectivo posterior del procesamiento.
 
 **Alineación D-W79-01 (decisión de diseño aprobada para WAB-79, 09/11/2026):** AgentDefinition conserva identidad lógica estable, sin versiones publicadas. Su configuración vigente se aplica a todas las AgentInstance vinculadas en nuevas ejecuciones; solo el estado `active` permite nuevas ejecuciones y `draft`, `suspended` o `retired` las bloquean para todas las instancias asociadas. El runtime valida el estado vigente y la propagación invalida/refresca caché. Las ejecuciones iniciadas conservan su snapshot y no se cancelan retroactivamente por cambios ordinarios.
 
-- Al iniciar una ejecución, el sistema crea una **instantánea inmutable** de la configuración efectiva: AgentDefinition identificada por su ID estable y configuración vigente, Rules, Skills, capabilities, knowledgeBaseIds y parámetros de ejecución de la AgentInstance.
+- Al aceptar duraderamente la ejecución lógica, antes del ack de entrada, el sistema crea una **instantánea inmutable** de la configuración efectiva: AgentDefinition identificada por su ID estable y configuración funcional vigente, LLMRoute identificada por `llmRouteId` y su revisión, Rules, Skills, capabilities, knowledgeBaseIds y parámetros operativos permitidos de AgentInstance; se excluyen overrides técnicos de proveedor/modelo. `startedAt` marca el inicio efectivo posterior del procesamiento.
 - La ejecución en curso conserva sus definiciones hasta finalizar. Los cambios posteriores en AgentDefinition, Rules, Skills o capabilities se aplican únicamente a las **nuevas ejecuciones**, nunca a la ejecución en curso.
 - AgentDefinition no tiene versiones publicadas. La AgentInstance mantiene una referencia estable a su ID; los cambios autorizados y auditados en la configuración vigente se aplican a todas las instancias vinculadas en nuevas ejecuciones. La propagación debe invalidar o refrescar la caché antes de aceptar nuevas ejecuciones, para impedir el uso de configuración obsoleta. Los cambios relevantes se notifican a los Workspaces afectados.
 - El estado de AgentDefinition se valida antes de cada nueva ejecución: solo `active` permite ejecutar. `draft`, `suspended` y `retired` bloquean nuevas ejecuciones de todas las AgentInstance asociadas. `retired` es terminal. Las ejecuciones ya iniciadas conservan su snapshot y no se cancelan retroactivamente por un cambio ordinario de estado; una política de seguridad puede ordenar su cancelación explícita.
-- Proveedor, modelo, credenciales y parámetros técnicos base son administrados por Waby. La allowlist de parámetros configurables por AgentInstance queda vacía por defecto; no se expone un objeto libre de configuración del proveedor (DEC-CM-03).
+- Proveedor, modelo, credenciales y parámetros técnicos base son administrados por Waby mediante LLMRoute. La allowlist de overrides técnicos por AgentInstance queda vacía y no se permite que la instancia modifique `llmRouteId` ni los parámetros de la ruta; no se expone un objeto libre de configuración del proveedor (DEC-CM-03, D-W79-03).
 - Cambio en SkillConfiguration o AgentRules → evento `agent_instance.updated` → afecta solo a nuevas ejecuciones; las ejecuciones en curso mantienen su instantánea.
 - Sin flujo draft/release para el cliente (I17). Los cambios de Waby se propagan inmediatamente a nuevas ejecuciones.
 
@@ -499,9 +578,9 @@ Se definen dos hashes con propósitos distintos:
 | Hash | Qué identifica | Campos que participan | Normalización antes de SHA-256 |
 |------|---------------|----------------------|-------------------------------|
 | `promptSnapshotHash` | Prompt efectivo construido | systemPrompt, Rules contenido, Skills contenido, knowledgeBaseIds (IDs solo, no contenido), mensajes de memoria, historial | Serialización JSON ordenada por clave, sin espacios, sin secretos |
-| `effectiveConfigHash` | Configuración efectiva completa | AgentDefinition.id + configuración efectiva capturada, agentInstanceId, skill IDs + versiones, rule IDs + versiones, capability IDs, provider, model, temperatura, maxTokens, knowledgeBaseIds | Serialización JSON ordenada por clave, sin espacios, sin secretos, sin credenciales |
+| `effectiveConfigHash` | Configuración efectiva completa | AgentDefinition.id + configuración funcional capturada, `llmRouteId` + `LLMRoute.version` + provider/model/parámetros efectivos, agentInstanceId, identidad de Skill por `source`/`ownerId`/`skillId`, release/hash según origen, configuración efectiva de SkillConfiguration, identidad, contenido y atributos efectivos de Rules (sin versionado propio), capability IDs, knowledgeBaseIds | Serialización JSON ordenada por clave, sin espacios, sin secretos, sin credenciales |
 
-**Nota importante:** Ningún hash por sí solo permite reconstruir una ejecución. `promptSnapshotHash` identifica el prompt; `effectiveConfigHash` identifica la configuración. Cada ejecución debe conservar `effectiveConfigSnapshot` con la identidad y configuración efectiva capturada de AgentDefinition, junto con las referencias identificables y versionadas aplicables a Rules, Skills y Knowledge. La resolución posterior de esas referencias no sustituye la persistencia del snapshot en la ejecución.
+**Nota importante:** Ningún hash por sí solo permite reconstruir una ejecución. `promptSnapshotHash` identifica el prompt; `effectiveConfigHash` identifica la configuración. Cada ejecución debe conservar `effectiveConfigSnapshot` con la identidad y configuración efectiva capturada de AgentDefinition, junto con la identidad, contenido y atributos efectivos de Rules (sin revisión/versionado propio), las referencias/releases de Skills Waby y las referencias de Knowledge cuando exista versionado, e identidad/hash para Skills propias de Workspace. La resolución posterior de esas referencias no sustituye la persistencia del snapshot en la ejecución.
 
 ---
 
@@ -511,14 +590,14 @@ El snapshot **no es solo una lista de IDs** que se vuelven a resolver contra reg
 
 `effectiveConfigSnapshot` es obligatorio y contiene, como mínimo:
 
-- AgentDefinition: `id` estable, configuración efectiva capturada y hash de esa configuración; no se registra una versión publicada inexistente.
-- Skills y configuración efectiva: IDs y versiones de Skill y SkillConfiguration.
-- Rules: IDs y versiones de las reglas aplicadas.
+- AgentDefinition: `id` estable, configuración funcional efectiva capturada y hash de esa configuración; no se registra una versión publicada inexistente.
+- LLMRoute: `llmRouteId`, `version` de la revisión utilizada, proveedor, modelo y parámetros técnicos efectivos capturados; no se almacenan secretos ni credenciales.
+- Skills y configuración efectiva: para Skills Waby, `source`/`ownerId`/`skillId` y release/version inmutable; para Skills propios, `source`/`ownerId`/`skillId` y hash del contenido vigente, sin versión histórica recuperable. Se captura la configuración efectiva de SkillConfiguration, sin inventar un campo `version` para esta configuración. La copia de trabajo del contenido propio queda fijada en el límite de inicio lógico de la ejecución (aceptación durable `createdAt`, antes del ack) y se mantiene disponible solo durante esa ejecución; `startedAt` continúa indicando el primer procesamiento efectivo del worker.
+- Rules: identidad estable, contenido y atributos efectivos de cada regla aplicada; no existe versionado propio de AgentRules (D-W79-12).
 - Capabilities: identificadores y versión/revisión cuando el catálogo la exponga.
 - Knowledge: IDs de las Knowledge Bases habilitadas, documentos recuperados con su versión y fragmentos efectivamente incorporados al contexto con sus IDs, versión/revisión disponible y hash de contenido.
-- Referencias de proveedor/modelo y parámetros técnicos efectivos no secretos.
 
-El snapshot incluye la configuración efectiva capturada de AgentDefinition y puede incluir además valores efectivos (por ejemplo, texto de Rules/Skills y prompt) para mejorar la reproducibilidad técnica. Esta captura no sustituye las referencias identificables/versionadas aplicables a recursos que sí tienen versionado propio ni autoriza almacenar secretos.
+El snapshot incluye la configuración efectiva capturada de AgentDefinition. Para Skills estándar Waby, la release inmutable permite identificar el contenido exacto y, cuando corresponda, conservar los valores efectivos según la política de trazabilidad del catálogo. Para Skills propios del Workspace, el snapshot persistido conserva identidad y hash, pero no el cuerpo histórico; el runtime mantiene una copia consistente del contenido cargado al inicio únicamente durante la ejecución. El hash no permite recuperar ese contenido ni garantiza reproducibilidad histórica. Esta captura no autoriza almacenar secretos.
 
 ---
 
@@ -526,7 +605,7 @@ El snapshot incluye la configuración efectiva capturada de AgentDefinition y pu
 
 `knowledgeBaseIds` identifica las bases de Knowledge habilitadas para la instancia, pero **no** registra el contenido efectivamente recuperado durante la ejecución.
 
-Para auditoría de qué contexto recibió la ejecución, se registra obligatoriamente en `AgentExecution.effectiveConfigSnapshot`. `AgentExecutionLog` puede registrar eventos y referencias de auditoría adicionales, pero no sustituye el snapshot obligatorio ni constituye una ubicación alternativa para sus referencias de Nivel 1 y Nivel 2:
+Para auditoría de qué contexto recibió la ejecución, se registra obligatoriamente en `AgentExecution.effectiveConfigSnapshot`. El diseño posterior de observabilidad podrá definir logs/trazas adicionales, pero no sustituirá el snapshot obligatorio ni constituirá una ubicación alternativa para sus referencias de Nivel 1 y Nivel 2:
 
 - IDs de las fuentes/documentos recuperados de Qdrant y su versión publicada.
 - IDs de los fragmentos efectivamente incorporados al prompt, con su versión/revisión disponible.
@@ -546,13 +625,13 @@ Si una fuente o fragmento no dispone de versionado propio, se conserva su identi
 
 | Aspecto | Nivel 1: Reconstrucción de configuración | Nivel 2: Trazabilidad del contexto | Nivel 3: Reproducción de ejecución |
 |---------|------------------------------------------|--------------------------------------|------------------------------------|
-| Qué se almacena | AgentDefinition.id + configuración efectiva capturada, Rule.id+version, Skill.id+version, SkillConfiguration.id+version, capability IDs/versiones disponibles, provider/model, parámetros y knowledgeBaseIds | IDs/versiones de documentos y chunks recuperados; IDs y hashes de los fragmentos efectivamente incorporados al contexto | Copia adicional de valores efectivos (sin secretos), cuando se requiera mayor reproducibilidad |
+| Qué se almacena | AgentDefinition.id + configuración funcional efectiva capturada, `llmRouteId`+`LLMRoute.version`+provider/model/parámetros efectivos, identidad/contenido/atributos efectivos de AgentRules (sin versionado propio), identidad Skill (`source`/`ownerId`/`skillId`) y release para Waby o hash para Workspace, configuración efectiva de SkillConfiguration sin versión artificial, capability IDs/versiones disponibles y knowledgeBaseIds | IDs/versiones de documentos y chunks recuperados; IDs y hashes de los fragmentos efectivamente incorporados al contexto | Copia adicional de valores efectivos (sin secretos), cuando se requiera mayor reproducibilidad; no conserva el cuerpo histórico de Skills propias del Workspace |
 | Puede reconstruir el prompt exacto | ❌ No, por referencias solamente | ❌ No, por referencias solamente | Puede reconstruir las condiciones de entrada; no garantiza la salida exacta |
 | Puede reproducir respuesta LLM exacta | ❌ No | ❌ No | ❌ No (modelos no deterministas) |
 | Costo de almacenamiento | Bajo | Medio | Mayor |
 | Uso recomendado | Auditoría obligatoria de configuración por ejecución | Auditoría obligatoria del contexto RAG utilizado | Reproducción técnica adicional de condiciones de entrada (P7) |
 
-**Decisión de diseño:** Los niveles 1 y 2 son obligatorios para cada ejecución y su contenido se conserva en `AgentExecution.effectiveConfigSnapshot`, fuente de verdad del snapshot inmutable. `AgentExecutionLog` registra eventos cronológicos y puede incluir referencias al snapshot, pero no lo sustituye ni almacena una copia alternativa de su contenido obligatorio. La copia adicional de valores efectivos del Nivel 3 es complementaria y puede optimizarse por almacenamiento, pero nunca se degradan ni omiten las referencias versionadas de Rules, Skills, documentos y fragmentos realmente utilizados; la configuración efectiva de AgentDefinition se conserva directamente en el snapshot.
+**Decisión de diseño:** Los niveles 1 y 2 son obligatorios para cada ejecución y su contenido se conserva en `AgentExecution.effectiveConfigSnapshot`, fuente de verdad del snapshot inmutable. El diseño futuro de observabilidad podrá registrar información técnica complementaria, pero no sustituirá el snapshot ni almacenará una copia alternativa de su contenido obligatorio. La copia adicional de valores efectivos del Nivel 3 es complementaria y puede optimizarse por almacenamiento; no puede convertirse en historial de Skills propias del Workspace ni conservar su cuerpo después de finalizar la ejecución. Nunca se degradan ni omiten la identidad, el contenido y los atributos efectivos de Rules, las referencias/releases de Skills Waby, las referencias de documentos y fragmentos realmente utilizados, ni la identidad/hash de Skills propias del Workspace; la configuración efectiva de AgentDefinition se conserva directamente en el snapshot.
 
 **Limitación importante:** Ningún nivel garantiza reproducibilidad exacta de la respuesta LLM. Los modelos de lenguaje son no deterministas, los proveedores pueden cambiar sus modelos, y las herramientas externas pueden devolver resultados diferentes. El snapshot garantiza trazabilidad de la configuración de entrada (Nivel 1) y del contexto (Nivel 2), no reproducibilidad de la salida (Nivel 3 solo reproduce condiciones de entrada, no el resultado exacto).
 
@@ -577,7 +656,7 @@ La tabla siguiente describe la superficie de gestión y las responsabilidades fu
 | Asignación efectiva de Contacto (`assignedType`, `ref_user_assigned`, `ref_agent_assigned`) | ✅ (autoridad única) | ❌ (proyección operativa `contact_assignments` solo para runtime) | CRM decide quién tiene asignado el contacto. `ref_agent_assigned` es referencia tipada a `AgentInstance._id`. Sin `assignmentVersion`. |
 | Historial funcional de asignaciones (`EvAssigned`) | ✅ (exclusivo en CRM, colección `eventos`) | ❌ (no se sincroniza) | Registra transiciones confirmadas de asignación. Identidad única de EvAssigned autoriza cada ejecución (resolución ABA). |
 | Cálculo y descuento de créditos | ✅ (persistencia y autoridad transaccional de saldo, ledger y autorizaciones) | ✅ (ejecuta invocaciones y reporta usage) | OrganizationAICredit, CreditLedger, ExecutionBudgetAuthorization y ExecutionBudgetAllocation persisten en CRM. ai-service no es autoridad de saldo ni autoriza presupuesto por cuenta propia. |
-| Auditoría por ejecución | ✅ (auditoría de negocio/financiera separada) | ✅ (fuente de verdad de AgentExecution y AgentExecutionLog) | CRM conserva CreditLedger y referencias financieras; no duplica el log operativo de ejecución. |
+| Registro de ejecución | ❌ (no es autoridad del ciclo técnico) | ✅ (`AgentExecution` es el registro persistente de dominio por ejecución) | CRM conserva CreditLedger y referencias financieras; logs/trazas técnicos quedan diferidos al diseño de observabilidad (D-W79-13). |
 | Eliminación de Workspace | ✅ (delete-wrk extendido) | ✅ (limpia ai_service) | Knowledge, vectores, media, ejecuciones |
 
 #### D.1.5 Modelo unificado de Contacto (decisión aprobada — WAB-78)
@@ -596,14 +675,15 @@ enum AssignedType {
 
 **Invariantes:**
 
-| assignedType | ref_user_assigned | ref_agent_assigned |
-|---|---|---|
-| `human` | UOW obligatorio | null |
-| `agent` | null | AgentInstance obligatoria (`AgentInstance._id`) |
-| `unassigned` | null | null |
+| assignedType | ref_user_assigned | ref_agent_assigned | ref_ev_assigned |
+|---|---|---|---|
+| `human` | UOW obligatorio | null | Último `EvAssigned` confirmado |
+| `agent` | null | AgentInstance obligatoria (`AgentInstance._id`) | Último `EvAssigned` confirmado |
+| `unassigned` | null | null | Último `EvAssigned` confirmado; registra también la liberación |
 
 **Reglas:**
 - `ref_agent_assigned` es una referencia tipada a `AgentInstance._id` en CRM.
+- `ref_ev_assigned` referencia el último `EvAssigned` confirmado del Contacto. Puede ser null antes de su primera transición; después de la primera transición permanece informado, incluso cuando el Contacto queda `unassigned`.
 - Ownership: `AgentInstance → Workspace → Organización`.
 - La asignación a agent solo se permite cuando contacto e instancia pertenecen al mismo Workspace.
 - No introducir `assignmentVersion` en Contacto.
@@ -614,29 +694,44 @@ enum AssignedType {
 - UOW nulo → `unassigned`
 - `ref_agent_assigned` nulo para todos los contactos existentes
 
-#### D.1.6 EvAssigned — historial funcional de asignaciones (decisión aprobada — WAB-78)
+#### D.1.6 EvAssigned — historial funcional de asignaciones (WAB-78, contrato reconciliado por D-W79-14)
 
 `EvAssigned` se implementa como discriminator de `Evento` en la colección `eventos` existente, exclusivamente en CRM.
 
 **Finalidad:** Registrar las transiciones confirmadas de asignación y conservar el historial funcional en CRM.
 
-**Debe permitir conocer:**
-- Responsable anterior y nuevo.
-- Tipo de cada responsable (`AssignedType` aprobado).
-- Actor que produjo la transición.
-- Operación que la originó (`operationType`, propuesta pendiente — separado de `AssignedType`).
-- Motivo, cuando corresponda.
-- Mensaje de origen, cuando corresponda (`originMessageId` para trazabilidad/idempotencia, no sustituye la identidad de EvAssigned).
-- Cadena de delegación, cuando corresponda.
-- Momento de confirmación.
+**Campos heredados de `Evento` (no se redeclaran en el discriminator):**
+
+| Campo | Significado |
+|---|---|
+| `_id` | Identidad única del evento y de la transición. |
+| `contacto` | Contacto afectado por la transición. |
+| `workspace` | Workspace propietario del Contacto. |
+| `createdAt` | Momento de registro de la transición; reemplaza a `assignedAt`. |
+| `updatedAt` | Última modificación heredada de `Evento`. |
+| `searchText` | Campo auxiliar de búsqueda heredado, si corresponde. |
+
+**Campos propios de `EvAssigned`:**
+
+| Campo | Tipo / nulabilidad | Significado |
+|---|---|---|
+| `prevAssignedType` | `AssignedType` | Tipo del responsable anterior: `human`, `agent` o `unassigned`. |
+| `prevAssignedRef` | String / ID nullable | Identificador del responsable anterior; `null` si no existía responsable. |
+| `newAssignedType` | `AssignedType` | Tipo del nuevo responsable: `human`, `agent` o `unassigned`. |
+| `newAssignedRef` | String / ID nullable | Identificador del nuevo responsable; `null` si queda sin asignar. |
+| `actorType` | Enum `user` / `agent` / `system` | Tipo de actor que produjo la transición. |
+| `actorRef` | String / ID obligatorio | Identidad del actor; no admite `null`, incluidas las operaciones automáticas del sistema. |
+| `operationType` | Enum | `automatic_assignment`, `self_assignment`, `manual_assignment`, `takeover`, `delegation`, `unassignment`. |
+| `reason` | String nullable | Motivo/contexto opcional de la transición. |
 
 **Decisiones:**
-- `EvAssigned` se persiste exclusivamente en CRM.
-- No se sincroniza el historial de `EvAssigned` con ai-service.
-- No se reconstruye retrospectivamente el historial anterior.
-- Cada transición confirmada tiene un identificador único.
+- `EvAssigned` se persiste exclusivamente en CRM y reutiliza `_id`, `contacto`, `workspace`, `createdAt`, `updatedAt` y `searchText` de `Evento`; no redeclara `contacto` ni agrega `assignedAt`.
+- Reutiliza los índices heredados `{contacto: 1, __t: 1, createdAt: -1}` y `{contacto: 1, createdAt: -1}`. No se crean índices equivalentes; cualquier índice adicional requiere una consulta runtime concreta que lo justifique.
+- `originMessageId` y `delegationChainId` no forman parte de `EvAssigned`. `originMessageId` conserva su función independiente en el contrato de Inbox/mensajería; no se duplica en el evento de asignación.
+- No se sincroniza el historial de `EvAssigned` con ai-service ni se reconstruye retrospectivamente el historial anterior.
+- Cada transición confirmada tiene un identificador único. Toda asignación, reasignación, takeover humano y liberación confirmados generan un nuevo `EvAssigned`.
+- `Contacto.ref_ev_assigned` apunta al último `EvAssigned` confirmado. Una liberación también actualiza esta referencia con el identificador del evento de liberación; no vuelve a null.
 - La identidad de `EvAssigned` se utiliza para identificar la asignación que autorizó una ejecución (resolución ABA).
-- `operationType` es una propuesta pendiente de aprobación, no una decisión aprobada por el usuario.
 
 #### D.1.7 Resolución de ABA con identidad de EvAssigned (decisión aprobada — WAB-78)
 
@@ -653,13 +748,15 @@ La identidad única de `EvAssigned` debe identificar qué transición autorizó 
 
 La ejecución originada por M1 conserva E1. Aunque Agent A vuelva a ser responsable mediante E4, la ejecución antigua de M1 no recupera autorización.
 
-`originMessageId` sirve para trazabilidad e idempotencia del mensaje de origen; no sustituye la identidad de la transición `EvAssigned`.
+`Contacto.ref_ev_assigned` siempre apunta al último `EvAssigned` confirmado, incluso cuando el Contacto queda `unassigned`: en la secuencia anterior conserva E3 durante la liberación y cambia a E4 con la nueva asignación. Cada `AgentExecution` conserva su `evAssignedId` de origen sin modificarlo.
+
+`originMessageId` sirve para trazabilidad e idempotencia del mensaje de origen dentro del contrato de Inbox/mensajería; no es un campo de `EvAssigned` ni sustituye la identidad de la transición.
 
 #### D.1.8 Atomicidad y persistencia
 
 **Requisito funcional:** los cambios de Contacto, `EvAssigned` y Outbox deben preservar una única transición lógica consistente. No deben quedar estados parciales que permitan una asignación efectiva sin su historial correspondiente o sin el mecanismo de propagación recuperable.
 
-**Solución técnica preferida:** actualizar Contacto, persistir `EvAssigned` y registrar Outbox dentro de una misma transacción MongoDB.
+**Solución técnica preferida:** actualizar Contacto (incluido `ref_ev_assigned`), persistir `EvAssigned` y registrar Outbox dentro de una misma transacción MongoDB.
 
 **Validación pendiente:** todavía no se verificó la compatibilidad de esa solución con la infraestructura real de MongoDB Atlas, incluyendo soporte de transacciones, sesiones y compatibilidad de las colecciones involucradas.
 
@@ -675,30 +772,33 @@ La propiedad de negocio, la superficie de API y la persistencia son dimensiones 
 
 | Entidad / recurso | Propietario de negocio | API / gestión | Persistencia fuente de verdad | Copias derivadas y límites |
 |---|---|---|---|---|
-| AgentDefinition, Prompt, PromptVersion asociados | Waby | Operaciones Waby-only en AI Service; CRM solo consulta/consume | **AI Service DB** | CRM no mantiene copia editable. Son definiciones globales, sin orgId ni workspaceId. |
+| AgentDefinition, Prompt, PromptVersion asociados | Waby | Operaciones Waby-only en AI Service; CRM solo consulta/consume | **AI Service DB** | CRM no mantiene copia editable. Son definiciones globales, sin orgId ni workspaceId; AgentDefinition referencia una LLMRoute por `llmRouteId`. |
+| LLMRoute | Waby | Gestión exclusiva Waby en AI Service | **AI Service DB** (`llm_routes`) | Configuración técnica autoritativa de proveedor/modelo/parámetros allowlisted; no almacena secretos. Las credenciales siguen en el almacén seguro Waby. |
 | AgentInstance | Workspace | CRM GraphQL y autorización CRM | **CRM DB** | AI Service consume la configuración necesaria para runtime; cualquier caché/proyección es descartable y no editable como autoridad. |
-| WorkspaceKnowledge, KnowledgeDocument y metadatos de ingestión | Workspace | CRM expone la API y valida permisos/ownership; AI Service ejecuta ingestión/procesamiento | **AI Service DB** (knowledge_bases y documentos equivalentes) | Se conserva la persistencia actual en AI Service, evitando una migración de autoridad no acordada. MinIO almacena binarios; Qdrant y chunks/embeddings son artefactos derivados reconstruibles. |
+| `WorkspaceKnowledge` (modelo físico `KnowledgeBase`) y `KnowledgeDocument` (modelo físico `Document`), con metadatos de ingestión | Workspace | CRM expone la API y valida permisos/ownership; AI Service ejecuta ingestión/procesamiento | **AI Service DB** (`knowledge_bases` para `KnowledgeBase`; `documents` para `Document`) | Workspace 1:N WorkspaceKnowledge y WorkspaceKnowledge 1:N KnowledgeDocument; cada documento referencia una KnowledgeBase mediante `knowledgeBaseId`. `Document.workspaceId` debe corresponder al workspace de su KnowledgeBase. Escrituras, ingesta v1/v2, RabbitMQ, recuperación RAG y eliminación/reingesta validan esa pertenencia; RAG aplica filtro vectorial de Workspace obligatorio y rechaza inconsistencias fail-closed (D-W79-06/07). No se crean colecciones duplicadas CRM. MinIO almacena binarios; Qdrant y chunks/embeddings son artefactos derivados reconstruibles. |
 | SkillConfiguration, AgentRules | AgentInstance | CRM GraphQL, bajo wrk.agents.* | **CRM DB** | AI Service los consume para componer la configuración efectiva; no mantiene una copia editable paralela. |
 | ConversationMemory | AgentInstance + conversación | AI Service runtime | **AI Service DB** | No se duplica como memoria operativa en CRM. El historial conversacional de CRM, si existe, es un recurso distinto. |
-| AgentExecution, AgentExecutionLog | AgentInstance + Workspace | AI Service runtime | **AI Service DB** | CRM recibe eventos/resultados y mantiene sus registros de negocio/financieros propios; no replica el log operativo como segunda autoridad. |
+| AgentExecution | AgentInstance + Workspace | AI Service runtime | **AI Service DB** | Único registro persistente de dominio por ejecución; observabilidad técnica diferida (D-W79-13). |
 | OrganizationAICredit, CreditLedger, ExecutionBudgetAuthorization, ExecutionBudgetAllocation | Organización | CRM y sus operaciones financieras | **CRM DB** | AI Service solicita autorización y reporta usage; no persiste ni modifica el saldo/ledger como autoridad. |
-| Contacto, ContactAssignment, EvAssigned, Outbox de asignación | CRM / Workspace según ownership del recurso | CRM | **CRM DB** | EvAssigned no se sincroniza como historial. La proyección contact_assignments de AI Service es derivada. |
-| contact_assignments | Derivado de ContactAssignment | AI Service runtime | **AI Service DB**, como proyección | No es fuente de verdad; debe poder reconciliarse/reconstruirse desde CRM. |
+| Contacto y estado actual de ContactAssignment, EvAssigned, Outbox de asignación | CRM / Workspace según ownership del recurso | CRM | **CRM DB** | Contacto conserva el estado actual y `ref_ev_assigned`; EvAssigned conserva el historial. El historial no se sincroniza a AI Service. |
+| `contact_assignments` | Derivado de ContactAssignment CRM | AI Service runtime | **AI Service DB**, como proyección | Usa `assignedType` (`human`/`agent`) y `assigneeId`; ausencia de fila activa representa `unassigned`. Las filas liberadas conservan tipo e identificador y llevan `evAssignedId=null`. No es fuente de verdad ni conserva el historial; debe poder reconciliarse/reconstruirse desde CRM (D-W79-04). |
 | AgentMessageOutbox | CRM | CRM | **CRM DB** | Mensaje de origen e intención de despacho CRM → AI Service en una misma unidad atómica; distinto del Outbox de asignación. |
 | AgentExecutionInbox | AI Service | AI Service | **AI Service DB** | Recepción durable/idempotente vinculada a un único AgentExecution y originMessageId. |
 | ExecutionResultOutbox | AI Service | AI Service | **AI Service DB** | Intención durable de publicar el resultado terminal; se confirma solo tras confirmación y enrutamiento válido del broker. |
 | ExecutionResultInbox | CRM | CRM | **CRM DB** | Recibo durable idempotente por eventId/executionId; Redis puede ser caché, no autoridad de deduplicación. |
 | Vectores, embeddings e índice de Knowledge | Derivado de WorkspaceKnowledge | AI Service ingestión/RAG | **Qdrant** (índice vectorial) y almacenamiento técnico de AI Service para chunks/metadatos de ingestión | No son fuente de verdad del documento ni de su ownership; pueden regenerarse desde el documento fuente. |
-| Binarios de documentos Knowledge | Workspace | CRM autoriza; AI Service procesa | **MinIO** (object storage) | El registro de propiedad/estado del documento permanece en AI Service DB; MinIO no es autoridad de dominio. |
+| Binarios de documentos Knowledge | Workspace | CRM autoriza; AI Service procesa | **MinIO**, espacio reservado a recursos Workspace | El registro de propiedad/estado del documento permanece en AI Service DB; MinIO no es autoridad de dominio. El objeto consume la cuota independiente del Workspace propietario. |
+| Binarios de recursos centrales Waby | Waby | Gestión exclusiva Waby | **MinIO**, espacio separado reservado a recursos centrales | No consumen cuota de Organización ni de Workspace. Sus metadatos centrales son independientes de las configuraciones Workspace. Referenciar/habilitar el recurso no transfiere propiedad ni copia automáticamente el binario; la materialización requiere operación explícita. |
 | Credenciales de proveedores LLM | Waby | Gestión exclusiva Waby | **Almacén seguro de secretos administrado por Waby**, fuera de las colecciones de dominio CRM/AI Service | Solo referencias/IDs versionados pueden aparecer en snapshots; nunca secretos. |
 
 **Consecuencias de la frontera:**
 
 1. CRM es autoridad de AgentInstance, SkillConfiguration, AgentRules, ContactAssignment y del ledger/créditos. AI Service es autoridad de AgentDefinition, Knowledge técnico, ConversationMemory y estado/log operativo de AgentExecution.
-2. WorkspaceKnowledge tiene propietario de negocio Workspace y API/controles de acceso en CRM, pero su persistencia canónica se conserva en AI Service DB. Esta separación explícita mantiene el patrón existente de fachada CRM y lectura/procesamiento AI Service; no autoriza dos colecciones editables para la misma entidad.
+2. `WorkspaceKnowledge` (modelo físico `KnowledgeBase`) y `KnowledgeDocument` (modelo físico `Document`) tienen propietario de negocio Workspace y API/controles de acceso en CRM, pero su persistencia canónica se conserva en AI Service DB (`knowledge_bases` y `documents`). Sus cardinalidades son Workspace 1:N WorkspaceKnowledge y WorkspaceKnowledge 1:N KnowledgeDocument; cada documento pertenece a una única KnowledgeBase. D-W79-07 exige validar esta pertenencia en escrituras, ingesta, consumers, recuperación, eliminación y reingesta; la recuperación aplica filtro vectorial tenant obligatorio y rechaza cualquier inconsistencia. Esta separación explícita mantiene el patrón existente de fachada CRM y lectura/procesamiento AI Service; no autoriza dos colecciones editables para la misma entidad.
 3. Los vectores Qdrant, chunks y contact_assignments son proyecciones/artefactos derivados. Deben poder reconstruirse desde su fuente de verdad y no pueden decidir ownership, permisos ni asignación.
 4. AgentExecution en AI Service y los movimientos CreditLedger en CRM son entidades distintas: la primera registra el ciclo técnico; los segundos son la autoridad financiera. La correlación se hace por executionId, organizationId y workspaceId, sin duplicar un ledger en AI Service.
 5. La persistencia de Contacto + EvAssigned + Outbox de asignación en CRM queda sujeta al requisito de atomicidad de D.1.8 y a la verificación de Atlas; ARQ-14 no convierte esa verificación de infraestructura (ARQ-06) en una decisión pendiente de ownership.
+6. Los catálogos y espacios de almacenamiento Waby/Workspace permanecen separados. Cada Workspace contabiliza únicamente sus propios recursos contra su cuota; no se agregan consumos de Workspaces hermanos en una bolsa de Organización. Los recursos Waby quedan fuera de cuotas de clientes. La Organización conserva el rol comercial de determinar el plan/entitlement aplicable, no el de compartir consumo de almacenamiento (D-W79-17).
 
 ### D.2 Operaciones GraphQL/HTTP necesarias
 
@@ -777,7 +877,7 @@ La autenticación/autorización del transporte y los scopes de servicio pertenec
 | originMessageId | CRM, asignado una sola vez al mensaje de origen | Identifica el mensaje entrante lógico. Debe permanecer estable en reintentos, republicaciones y redeliveries. |
 | executionId | AI Service, asignado al aceptar por primera vez originMessageId | Identifica la única ejecución lógica asociada al mensaje. Se conserva en recuperación/reintentos; no se genera otro por redelivery. |
 | eventId | Servicio publicador del evento | Identifica un evento de integración concreto y permite deduplicar su publicación/consumo. Se conserva al republicar el mismo evento. |
-| evAssignedId | CRM, identidad de la transición de asignación | Identifica la transición que autorizó la ejecución y resuelve ABA. No sustituye originMessageId ni executionId. |
+| evAssignedId | CRM, identidad de la transición de asignación | Obligatorio en el envelope y en AgentExecution; identifica la transición que autorizó la ejecución y resuelve ABA. Es inmutable por ejecución. No sustituye originMessageId ni executionId. |
 
 originMessageId debe ser una identidad canónica y estable de CRM. Si el identificador externo del canal no es globalmente único, se conserva junto con el sistema/canal de origen y se define una clave compuesta estable, al menos acotada por workspaceId. El contenido normalizado del mensaje puede llevar un hash para detectar reutilización conflictiva de la misma clave.
 
@@ -788,11 +888,11 @@ originMessageId debe ser una identidad canónica y estable de CRM. Si el identif
 3. El Outbox solo se marca publicado después de confirmación positiva y enrutamiento válido. Fallos, timeout o confirmación incierta dejan el registro recuperable para reintento; no se absorben como éxito.
 4. La republicación conserva originMessageId y la identidad del evento. Una confirmación incierta puede producir duplicados físicos en RabbitMQ; la deduplicación del consumidor es obligatoria.
 
-El envelope de entrada incluye como mínimo eventId, eventType, schemaVersion, occurredAt, correlationId, originMessageId, organizationId, workspaceId, agentInstanceId, conversationId, contactId, channel y el contenido normalizado necesario. Los campos tenant/recurso se validan contra CRM y el contexto autenticado; no se confía en valores libres del payload.
+El envelope de entrada incluye como mínimo eventId, eventType, schemaVersion, occurredAt, correlationId, originMessageId, organizationId, workspaceId, agentInstanceId, conversationId, contactId, `evAssignedId` y channel, además del contenido normalizado necesario. `evAssignedId` es obligatorio y no nulo para todo envelope que inicia una `AgentExecution`; CRM lo obtiene de `Contacto.ref_ev_assigned` al autorizar el despacho y no publica una ejecución si el Contacto no tiene una asignación `agent` vigente. Los campos tenant/recurso se validan contra CRM y el contexto autenticado; no se confía en valores libres del payload.
 
 #### D.6.4 Recepción, persistencia e idempotencia en AI Service
 
-1. El consumidor usa ack manual. Antes de confirmar el mensaje RabbitMQ, valida el envelope y persiste una recepción durable vinculada a originMessageId y a un único executionId.
+1. El consumidor usa ack manual. Antes de confirmar el mensaje RabbitMQ, valida el envelope y persiste una recepción durable vinculada a originMessageId y a un único executionId. Al crear AgentExecution, persiste `evAssignedId` como obligatorio e inmutable; la recuperación y los reintentos conservan exactamente ese identificador, sin recalcularlo desde la proyección vigente.
 2. La unicidad lógica de recepción se aplica, como mínimo, por (workspaceId, channel, originMessageId) —o clave equivalente si CRM garantiza un ID global—. La restricción física/índice se concreta en WAB-81, pero la unicidad es parte obligatoria del contrato.
 3. La persistencia de la recepción y su asociación a la ejecución lógica debe ser atómica. Si la escritura no se confirma, el consumidor no hace ack: reintenta/reencola según política. No se acepta continuar en memoria sin registro durable.
 4. Si llega una redelivery con la misma clave y el mismo contenido lógico, el consumidor recupera la recepción/ejecución existente y hace ack sin crear otra ejecución ni volver a invocar el pipeline. Si la misma clave llega con contenido incompatible, se registra conflicto y se envía a cuarentena/DLQ; no se sobrescribe ni se ejecuta de nuevo.
@@ -870,8 +970,8 @@ Entrada (RabbitMQ / HTTP interno)
         │
         ▼
 ┌─────────────────────────┐
-│ 5. Cargar configuración │  AgentDefinition + AgentInstance (Skills,
-│    del agente           │  Rules, knowledgeBaseIds, additionalPrompt).
+│ 5. Cargar configuración │  AgentDefinition + LLMRoute vigente + AgentInstance
+│    del agente           │  (Skills, Rules, knowledgeBaseIds, additionalPrompt).
 │                         │  Instantánea inmutable al iniciar la ejecución   │
 │                         │  (P10): crear instantánea de configuración       │
 │                         │  efectiva; calcular promptSnapshotHash y         │
@@ -881,9 +981,12 @@ Entrada (RabbitMQ / HTTP interno)
         │
         ▼
 ┌─────────────────────────┐
-│ 6. Cargar Knowledge     │  RAG filtrado por workspaceId (BR-KB-001).
-│    (RAG)                │  Qdrant error → error visible, no [] silencioso.
-│                         │  No exigir agentInstanceId como filtro (I11).   │
+│ 6. Cargar Knowledge     │  Validar en lote que todos los knowledgeBaseIds
+│    (RAG)                │  pertenecen al Workspace del contexto.
+│                         │  Filtro Qdrant workspaceId obligatorio, derivado
+│                         │  del contexto validado (D-W79-07). Qdrant error
+│                         │  → error visible, no [] silencioso. No exigir
+│                         │  agentInstanceId como filtro (I11).
 │                         │  Registrar IDs de fragmentos recuperados para   │
 │                         │  trazabilidad RAG (P10).                        │
 └─────────────────────────┘
@@ -917,8 +1020,8 @@ Entrada (RabbitMQ / HTTP interno)
         │
         ▼
 ┌─────────────────────────┐
-│ 11. Invocar proveedor   │  Provider/modelo centralizados (Waby). Credencial
-│    LLM y ejecutir tools │  gestionada por Waby, nunca expuesta al cliente.│
+│ 11. Invocar proveedor   │  LLMRoute vigente resuelve un único provider/modelo.│
+│    LLM y ejecutar tools │  Credencial Waby; nunca expuesta al cliente.    │
 │                         │  Capabilities filtradas por instancia (I12).     │
 │                         │  Output filter antes de enviar al usuario.     │
 │                         │  Antes de cada invocación facturable, asignar   │
@@ -945,7 +1048,7 @@ Entrada (RabbitMQ / HTTP interno)
         │
         ▼
 ┌─────────────────────────┐
-│ 15. Persistir ejecución │  AgentExecution + AgentExecutionLog (campos     │
+│ 15. Persistir ejecución │  AgentExecution (registro de dominio; sin AgentExecutionLog)     │
 │    y auditoría          │  I21: promptSnapshotHash, effectiveConfigHash,  │
 │                         │  effectiveConfigSnapshot, provider_model_used,  │
 │                         │  tokens, créditos, latencia, resultado).        │
@@ -991,11 +1094,12 @@ Esta sección consolida los acuerdos funcionales de P2 sobre recepción automát
 **Acordado:**
 
 - Una AgentInstance puede ser marcada como predeterminada por un usuario autorizado del Workspace.
-- Puede existir cero o una instancia predeterminada por Workspace; nunca más de una.
-- El cambio de `isDefault` es atómico.
+- Puede existir cero o una instancia predeterminada por Workspace; nunca más de una, independientemente del estado del ciclo de vida de la instancia (`draft`, `active`, `suspended`, `retirement_pending`, `retired`).
+- El cambio de `isDefault` es una operación transaccional y se protege mediante un índice único parcial por `workspaceId` para documentos con `isDefault=true`. Las solicitudes concurrentes en conflicto no pueden dejar un estado parcial.
+- Suspender la instancia predeterminada conserva `isDefault`; no se selecciona automáticamente otra instancia.
 - La creación de una instancia no obliga a que el Workspace tenga siempre una predeterminada. Si no existe una predeterminada activa, el contacto permanece sin asignación.
 
-- Cambiar `isDefault` no migra ni altera ContactAssignment existentes (DEC-CM-08).
+- Cambiar `isDefault` no migra ni altera ContactAssignment existentes (DEC-CM-08 / D-W79-16).
 
 **Decisión aprobada DEC-CM-06/08:** no existe selección entre varias predeterminadas ni fallback por prioridad.
 
@@ -1132,7 +1236,9 @@ No diseñar todavía nuevos eventos ni mecanismos alternativos antes de auditar 
 - Una única asignación efectiva de atención por contacto.
 - Solo el responsable vigente puede procesar mensajes mediante IA.
 - Todas las transferencias validan ownership y pertenencia al mismo Workspace.
-- Los cambios de Contacto, `EvAssigned` y Outbox deben preservar una única transición lógica consistente. La solución preferida es persistir los tres elementos en una misma transacción MongoDB. Su viabilidad está pendiente de verificar en la infraestructura real de MongoDB Atlas, incluyendo soporte de transacciones, sesiones y compatibilidad de las colecciones involucradas.
+- Cada transición de asignación persiste `Contacto`, `EvAssigned` y Outbox dentro de una única transacción MongoDB. El ID de `EvAssigned` se genera antes del CAS y se reutiliza en las escrituras relacionadas. El CAS comprueba el estado anterior esperado de `Contacto`, incluyendo `ref_ev_assigned`; si no coincide o falla cualquier escritura, se aborta la transacción completa. No se permite degradar silenciosamente a escrituras secuenciales.
+- La publicación de eventos, sincronización de `contact_assignments` y cualquier comunicación/efecto externo ocurre después del commit mediante procesamiento asíncrono al menos una vez e idempotente. La transacción no se extiende a AI Service ni a servicios externos.
+- `contactos`, `eventos` y Outbox pertenecen a la misma base de datos MongoDB Atlas (confirmación del usuario). Antes de implementar debe verificarse que el clúster Atlas utilizado tenga una topología compatible con transacciones multidocumento (replica set o clúster sharded) y que todas las operaciones propaguen la misma sesión MongoDB. La inspección local no confirma por sí sola esos dos aspectos.
 - Los cambios de responsable invalidan ejecuciones incompatibles con la nueva asignación.
 - Los workers RabbitMQ vuelven a validar antes de procesar o enviar mensajes.
 - Los reintentos no generan asignaciones ni respuestas duplicadas.
@@ -1169,7 +1275,7 @@ CRM es la autoridad de vigencia. Antes de cualquier efecto externo, se debe comp
 
 - Contacto con `assignedType = agent`.
 - `ref_agent_assigned` coincide con la AgentInstance ejecutora.
-- Identidad `EvAssigned` vigente coincide con la que autorizó la ejecución.
+- `Contacto.ref_ev_assigned` coincide con `AgentExecution.evAssignedId`, es decir, con la identidad `EvAssigned` que autorizó la ejecución.
 - Contacto e instancia pertenecen al mismo Workspace.
 - Instancia sigue en estado que permite ejecutar.
 
@@ -1218,7 +1324,7 @@ El contexto enviado al proveedor LLM sigue este orden estricto:
 
 ## G. Proveedores, créditos y telemetría
 
-### G.1 Routing centralizado de modelos (I18)
+### G.1 Routing centralizado de modelos (I18, D-W79-03)
 
 **Principio:** Waby administra proveedor, modelo e hiperparámetros. El cliente no los selecciona ni los configura.
 
@@ -1232,23 +1338,26 @@ El contexto enviado al proveedor LLM sigue este orden estricto:
 | Credenciales API de proveedores LLM | Waby (central, cifradas) | ❌ No |
 | Credenciales de integraciones empresariales | Workspace, mediante usuarios autorizados y solo para integraciones permitidas | Sí, dentro de la allowlist y políticas Waby |
 
-**Implementación:** Tabla de rutas central y versionada (configuración, no código) que resuelve un único proveedor y modelo LLM activo por AgentDefinition (P8). La estructura podrá admitir proveedores de respaldo en el futuro, pero en esta fase cada AgentDefinition utiliza un solo LLM: no hay rotación ni fallback entre proveedores. Los reintentos técnicos, si se habilitan, se realizan contra el mismo proveedor/modelo. Esta configuración nunca se expone por API al cliente.
+**Implementación:** colección central `llm_routes`, con configuración versionada y administrada exclusivamente por Waby. Cada AgentDefinition referencia una ruta lógica mediante `llmRouteId`; la ruta identifica un único proveedor y modelo efectivo en cada revisión. Los cambios incrementan `LLMRoute.version` y afectan nuevas ejecuciones; el snapshot conserva la revisión y sus valores efectivos. En esta fase cada AgentDefinition utiliza un solo LLM: no hay rotación ni fallback automático entre proveedores. Los reintentos técnicos, si se habilitan, se realizan contra el mismo proveedor/modelo y la misma revisión de LLMRoute capturada al iniciar la ejecución. Esta configuración nunca se expone ni puede sobrescribirse por API del cliente.
 
-### G.2 Credenciales de proveedores LLM administradas por Waby (I6)
+### G.2 Credenciales de proveedores LLM administradas por Waby (I6, D-W79-03, D-W79-08)
 
-- Las API keys de proveedores LLM son gestionadas exclusivamente por Waby.
-- Cifradas en reposo (AES-256-GCM o equivalente).
-- Nunca expuestas al cliente, ni en respuestas de API, ni en logs.
-- La `aiCredential` per-bot del modelo actual se elimina; se reemplaza por credenciales centralizadas de Waby asociadas al routing de proveedores.
+- Las API keys y cuentas de proveedores LLM son gestionadas exclusivamente por Waby; el cliente no aporta sus propias API keys ni selecciona libremente el proveedor.
+- Waby controla el proveedor, modelo, routing y parámetros técnicos permitidos. `AgentDefinition` referencia una `LLMRoute` mediante `llmRouteId`; `LLMRoute` almacena configuración técnica versionada, no el secreto del proveedor.
+- Las credenciales LLM se custodian mediante el mecanismo seguro administrado por Waby y nunca se exponen al cliente, en respuestas API o logs.
+- `Bot.model`, `Bot.aiCredential` y el cifrador `Aes256GcmCredentialCipher` ligado al esquema anterior pertenecen al modelo legacy de API keys aportadas por los clientes. `aiCredential` per-bot se elimina del objetivo; ese mecanismo legacy no se toma como fundamento del dominio de credenciales empresariales.
 
-Esta regla se limita a credenciales de proveedores LLM y no transfiere a Waby la administración de credenciales de integraciones empresariales del Workspace.
+Esta regla se limita a credenciales LLM Waby-owned y no transfiere a Waby la administración de las cuentas ni de los valores de credenciales empresariales del Workspace.
 
-### G.2.1 Credenciales de integraciones empresariales administradas por Workspace
+### G.2.1 Credenciales de integraciones empresariales administradas por Workspace (D-W79-08)
 
-- Los usuarios autorizados del Workspace configuran, actualizan y revocan las credenciales de las integraciones empresariales que Waby habilita para sus AgentInstance.
-- Waby define la allowlist de integraciones, las capacidades disponibles y las políticas de seguridad; no administra las cuentas ni decide los valores de las credenciales empresariales del cliente.
-- `SkillConfiguration.credentials` contiene únicamente referencias a credenciales (IDs), nunca sus valores secretos. La resolución y el uso de esos secretos se realizan mediante el mecanismo seguro de credenciales de la plataforma.
-- Los valores secretos de credenciales empresariales nunca se copian a `effectiveConfigSnapshot`, prompts, logs ni metadatos de ledger. Cuando sea necesaria trazabilidad, puede conservarse únicamente una referencia identificable/versionada no secreta.
+- Los usuarios autorizados del Workspace configuran, actualizan y revocan las credenciales de las integraciones empresariales habilitadas por Waby para sus AgentInstance.
+- Waby define la allowlist de integraciones, conectores, operaciones/capacidades y políticas de seguridad; no administra las cuentas del cliente ni decide los valores de sus credenciales empresariales.
+- `AgentInstanceIntegration` representa conceptualmente la conexión privada de una AgentInstance y es la única ubicación de configuración que conserva la referencia protegida a su credencial. La referencia queda vinculada a la cadena Organization → Workspace → AgentInstance; no se presume compartición entre instancias.
+- Waby opera la custodia segura y resolución del secreto durante la invocación controlada. El material secreto no se incorpora a `AgentInstance`, `SkillConfiguration`, `AgentDefinition`, `LLMRoute` ni a la configuración ordinaria.
+- `SkillConfiguration` no contiene un campo `credentials` ni referencias directas a credenciales. La asociación exacta entre Skills y operaciones/capacidades habilitadas se define en el contrato operativo correspondiente, sin duplicar la referencia protegida de conexión.
+- Los valores secretos nunca se copian a `effectiveConfigSnapshot`, prompts, logs ni metadatos de ledger. Para trazabilidad puede conservarse únicamente una referencia identificable y su revisión/versión no secreta.
+- La revocación de seguridad bloquea nuevas invocaciones incluso cuando una ejecución conserve un snapshot anterior. El comportamiento de una llamada externa que ya fue aceptada por el proveedor no se presume reversible.
 
 ### G.3 Cálculo de tokens
 
@@ -1420,7 +1529,7 @@ El orden operativo debe permitir clasificar la responsabilidad sobre el despacho
 2. **Validación de autorización y fencing:** Antes de registrar resultados financieros, se verifica que la autorización y las asignaciones utilizadas sigan vigentes y que el worker conserve el `fencingGeneration` correspondiente.
 3. **Clasificación del resultado:** Se determina si cada invocación produjo un resultado técnicamente válido, parcial válido o un fallo técnico sin resultado válido, conforme a G.4.6.
 4. **Despacho y atribución:** Cuando corresponda enviar una respuesta, se registra el resultado del intento de despacho y se distingue un fallo de integración/código propio de Waby de un fallo del proveedor externo del canal. Si Waby impide el despacho por un fallo propio, el consumo correspondiente no es facturable; si falla el proveedor externo del canal, el consumo LLM confirmado se mantiene facturable conforme a G.4.6.
-5. **Persistencia y reconciliación:** Se conservan `AgentExecution`, `AgentExecutionLog`, usage por invocación y resultados de despacho necesarios para auditar la decisión. Si una invocación mantiene usage o resultado externo desconocido, permanece en `reconciliation_required`, retiene su asignación y no se liquida todavía el débito final de la ejecución.
+5. **Persistencia y reconciliación:** Se conserva `AgentExecution` como registro de dominio, junto con usage por invocación y resultados de despacho necesarios para la liquidación. No se introduce `AgentExecutionLog`; logs/trazas se difieren al diseño de observabilidad (D-W79-13). Si una invocación mantiene usage o resultado externo desconocido, permanece en `reconciliation_required`, retiene su asignación y no se liquida todavía el débito final de la ejecución.
 6. **Vencimiento de reconciliación:** Si la invocación continúa sin evidencia concluyente al vencer los **30 días** desde su entrada en `reconciliation_required`, se excluye únicamente ese consumo no confirmado y se libera la capacidad de esa asignación. La evidencia tardía no produce un débito retroactivo automático.
 7. **Liquidación financiera final:** Solo cuando todas las invocaciones estén resueltas se calcula el total facturable. Si es mayor que cero, se crea un único `deduct` por `executionId` y se actualiza `OrganizationAICredit.balance` junto con la liberación de `committedBudget` en una transacción MongoDB corta. Si no hay importe facturable, se cierra la autorización y libera la capacidad sin crear un débito de importe cero.
 
@@ -1608,9 +1717,11 @@ El estado técnico `failed` por sí solo no determina el tratamiento financiero.
 
 **Alcance de P4:** P4 controla exclusivamente créditos por consumo de proveedores LLM. Las ejecuciones HTTP externas, Skills, APIs externas y otras operaciones no-LLM quedan fuera de esta política, salvo una decisión futura explícita y separada.
 
-### G.5 Logs de auditoría (I21)
+### G.5 Registro persistente de ejecución y observabilidad diferida (D-W79-13)
 
-Cada ejecución genera `AgentExecution` + `AgentExecutionLog` con:
+La sección histórica I21 describía un `AgentExecutionLog`; D-W79-13 la deja supersedida en cuanto a la creación de una entidad/colección de logs. No se persisten eventos internos por ejecución en WAB-79. Los campos consolidados siguientes pertenecen a `AgentExecution`:
+
+Cada ejecución persiste un único registro de dominio `AgentExecution`, que conserva:
 
 | Campo | Descripción |
 |-------|-------------|
@@ -1629,7 +1740,7 @@ Cada ejecución genera `AgentExecution` + `AgentExecutionLog` con:
 
 **No se exponen modelos/versiones/parámetros al cliente** (I9, I21).
 
-**Nota de trazabilidad:** `prompt_snapshot_hash` identifica el prompt; `effective_config_hash` identifica la configuración completa. Ninguno permite reconstruir la ejecución por sí solo; para reproducibilidad completa se requiere `effective_config_snapshot`, que conserva la identidad estable y configuración efectiva capturada de AgentDefinition, junto con las referencias versionadas aplicables a Rules y Skills.
+**Nota de trazabilidad:** `prompt_snapshot_hash` identifica el prompt; `effective_config_hash` identifica la configuración completa. Ninguno permite reconstruir la ejecución por sí solo; para reproducibilidad completa se requiere `effective_config_snapshot`, que conserva la identidad estable y configuración efectiva capturada de AgentDefinition, junto con la identidad, contenido y atributos efectivos de AgentRules (sin versionado propio, D-W79-12) y las referencias/releases de Skills que correspondan.
 
 ### G.6 Métricas por instancia y Organización (I20, P5)
 
@@ -1648,92 +1759,97 @@ Los desgloses por Workspace y AgentInstance son estadísticas y atribución. No 
 
 ---
 
-## H. Migración y compatibilidad
+## H. Reemplazo del modelo legacy y tratamiento de datos existentes
 
-### H.1 Matriz conservar / adaptar / separar / reemplazar / retirar
+> **Aclaración de alcance:** la implementación de IA basada en Bot/BotInstance nunca llegó a producción. Por tanto, no hay migración de datos de Bot, BotInstance, Rules, Skills, Knowledge, asignaciones de agente, ejecuciones, memoria, credenciales ni proyecciones AI Service; tampoco se requiere backfill, cutover, coexistencia temporal, compatibilidad hacia atrás ni rollback de ese modelo. Las tablas siguientes expresan correspondencias conceptuales y decisiones de reemplazo, no un procedimiento de transferencia de registros. La transición de datos CRM que sí existan en producción (por ejemplo, asignaciones humanas actuales de Contacto) se trata separadamente en H.11.
+
+### H.1 Matriz de reemplazo / reutilización técnica / retiro
 
 | Elemento actual | Acción | Justificación | Invariantes |
 |-----------------|--------|---------------|-------------|
-| `Bot` (definición + instancia mezcladas) | Separar → `AgentDefinition` (Waby) + `AgentInstance` (Workspace) | `Bot` mezcla definición e instancia (Fase 1) | I1, I2, I16 |
-| `BotInstance` | Adaptar → `AgentInstance` (propiedad Workspace) | Ya existe, cambiar propiedad y campos | I2, I16 |
+| `Bot` (definición + instancia mezcladas) | Reemplazar → `AgentDefinition` (Waby) + `AgentInstance` (Workspace) | Separar definición e instancia; crear el modelo objetivo sin migrar registros legacy | I1, I2, I16 |
+| `BotInstance` | Retirar y reemplazar por `AgentInstance` (propiedad Workspace) | Nueva entidad y persistencia; no trasladar registros ni mantener compatibilidad | I2, I16 |
 | `ModelConfiguration` por bot | Reemplazar → routing central Waby | Configurable por bot hoy, debe ser Waby | I18 |
 | Credencial per-bot (D*-cred) | Reemplazar → credenciales LLM centralizadas Waby | Cliente gestiona API keys de proveedor LLM hoy (violación I6) | I6 |
-| `enabledCapabilities` global en pipeline | Separar → filtrar por instancia | `findAll()` carga todas (Fase 1, R7) | I8, I12 |
-| RAG filtro `config.workspaceId` | Conservar → `WorkspaceKnowledge` | Cumple I11 (compartido por workspace) | I11 |
+| `enabledCapabilities` global en pipeline | Reemplazar por `SkillConfiguration` por instancia | El contrato anterior no se conserva; la instancia nueva define explícitamente sus Skills | I8, I12 |
+| RAG y pertenencia de Knowledge | Reforzar → `WorkspaceKnowledge` y KnowledgeBases del Workspace | Validación agrupada de `knowledgeBaseIds` contra el Workspace y filtro Qdrant obligatorio derivado del contexto (D-W79-07) | I11 |
 | `memory-manager` (30 facts) | Reemplazar → `ConversationMemory` (ventana 20) | No existe ventana 20 (Fase 1, R10) | I14 |
-| `Execution` (workspaceId, model, status) | Conservar + ampliar → campos I20, I21 | Necesario para auditoría y créditos | I20, I21 |
+| `Execution` (workspaceId, model, status) | Retirar y crear `AgentExecution` | Nuevo contrato D-W79-05; no reutilizar la entidad ni migrar ejecuciones legacy | I20, I21 |
 | `delete-wrk` (solo DB crm) | Adaptar → limpiar ai_service, Qdrant, MinIO | No toca recursos de agente hoy (Fase 1, R14) | Invariante 13 |
 | Sistema de créditos | Crear → `OrganizationAICredit` + `CreditLedger` | No existe hoy (Fase 1, R1) | I17, I20, I21 |
 | Policy Engine | Crear → políticas no delegables | No existe hoy (Fase 1, R8) | I8 |
 | Output filter | Crear → filtrar respuesta antes de enviar | No existe hoy (Fase 1, R11) | I8, I9 |
 
-**Frontera de persistencia objetivo (ARQ-14):** AgentInstance y SkillConfiguration/AgentRules persisten en CRM; AgentDefinition, WorkspaceKnowledge/documentos, ConversationMemory y AgentExecution/AgentExecutionLog persisten en AI Service DB. Qdrant es índice derivado, MinIO almacena binarios y CRM conserva los créditos/ledger. La matriz normativa completa está en D.1.9. La persistencia de Knowledge se mantiene en AI Service DB; no se introduce una migración de fuente de verdad a CRM.
+**Frontera de persistencia objetivo (ARQ-14):** AgentInstance y SkillConfiguration/AgentRules persisten en CRM; AgentDefinition, LLMRoute, WorkspaceKnowledge/documentos, ConversationMemory y AgentExecution persisten en AI Service DB. La observabilidad técnica de ejecuciones queda diferida por D-W79-13. Qdrant es índice derivado, MinIO almacena binarios y CRM conserva los créditos/ledger. La matriz normativa completa está en D.1.9. La persistencia de Knowledge se define en AI Service DB; esto no implica conservar ni migrar datos de la implementación legacy, que no llegó a producción.
 
-### H.2 Correspondencia Bot → AgentDefinition / AgentInstance
+### H.2 Correspondencia conceptual Bot → AgentDefinition / AgentInstance (sin migración de datos)
 
 | Campo de Bot actual | Destino en modelo objetivo | Notas |
 |---------------------|---------------------------|-------|
-| id | AgentInstance.id | La instancia hereda el ID del bot o se genera nuevo |
+| id | No se transfiere | `AgentDefinition` y `AgentInstance` reciben identidades nuevas según sus respectivos owners; no se reutiliza el ID de Bot legacy |
 | workspaceId | AgentInstance.workspaceId | Denormalizado, validado cross-tenant |
 | name | AgentInstance.name | Nombre visible al cliente |
-| model (provider, name, temp, etc.) | AgentDefinition (campos de proveedor) | Waby centraliza, migra a definición |
-| aiCredential | Eliminado | Credenciales de proveedores LLM centralizadas en Waby |
-| enabledCapabilities | SkillConfiguration (por instancia) | Migrado como skills de la instancia |
+| model (provider, name, parámetros técnicos) | LLMRoute | Waby centraliza en una entidad técnica independiente; AgentDefinition la referencia por `llmRouteId` |
+| aiCredential | Eliminado | Campo del modelo legacy con API key LLM aportada por el cliente; en el objetivo, Waby custodia las credenciales LLM centralizadas fuera de Bot/AgentInstance y las utiliza mediante su routing |
+| enabledCapabilities | SkillConfiguration (por instancia) | Las Skills se configuran de nuevo según el catálogo y ownership objetivo; no se migran asociaciones legacy |
 | knowledgeBaseIds | AgentInstance.knowledgeBaseIds | Referencias a WorkspaceKnowledge |
 | promptId / activePromptVersionId | AgentDefinition (prompt del sistema) | La definición lleva el prompt base; cualquier versionado de PromptVersion no crea versiones publicadas de AgentDefinition |
-| status | AgentInstance.status | `active` / `inactive` → `active` / `suspended` |
-| temperature, maxIterations | AgentDefinition + AgentInstance override | Hiperparámetros centralizados en definición |
+| status | AgentInstance.status | El estado inicial se define al crear la instancia según el ciclo de vida objetivo; no se convierte el estado de registros legacy |
+| temperature y parámetros técnicos de modelo | LLMRoute | Waby centraliza; no existen overrides técnicos en AgentInstance. `maxIterations` debe tratarse según la configuración de ejecución/capacidad que corresponda, no como parámetro de proveedor. |
 
-### H.3 Migración de BotInstance
+### H.3 Reemplazo de BotInstance
 
-Cada `BotInstance` actual se migra a `AgentInstance`:
-- `botId` → `agentDefinitionId` (el Bot se convierte en AgentDefinition)
-- `workspaceId` → mantenido (denormalizado)
-- Campos sobrescribibles (modelConfig, temperature, systemPrompt, enabledCapabilities) → migrados a SkillConfiguration / AgentRules / additionalPrompt de la instancia
+No se migran instancias legacy. El nuevo `AgentInstance` se crea conforme al contrato de dominio y ownership aprobado:
+- `agentDefinitionId` referencia una `AgentDefinition` existente y activa; no se deriva mediante conversión de un `botId` legacy.
+- `workspaceId` identifica el Workspace propietario y se valida en el contexto de autorización.
+- `LLMRoute` define la configuración técnica bajo control de Waby; no se copian `modelConfig` ni `temperature` legacy.
+- El prompt base pertenece a `AgentDefinition`; las instrucciones empresariales permitidas se configuran en `additionalPrompt`.
+- Skills y Rules se configuran como recursos nuevos por instancia según `SkillConfiguration` y `AgentRules`.
 
 ### H.4 Knowledge y Qdrant
 
-- `knowledge_bases` → `WorkspaceKnowledge` (misma estructura, propiedad de workspace)
-- Vectores Qdrant: migrados manteniendo filtro por `workspaceId` (BR-KB-001 ya cumple I11)
-- Al eliminar una WorkspaceKnowledge: invalidar embeddings asociados en Qdrant (purge automático)
+- `KnowledgeBase` y `Document` son los modelos físicos previstos para `WorkspaceKnowledge` y `KnowledgeDocument` (D-W79-06/07), sujetos a validar el esquema contra el contrato objetivo. Su reutilización no implica migrar documentos o datos de la implementación legacy.
+- Los nuevos documentos se incorporan mediante el flujo de ingesta objetivo y sus vectores se generan bajo el contrato nuevo; no se trasladan vectores legacy.
+- En cada búsqueda, el adaptador vectorial aplica `workspaceId` como filtro de metadata no omitible ni sustituible por el caller; el namespace de colección no reemplaza la validación de pertenencia.
+- Al eliminar una WorkspaceKnowledge: invalidar embeddings asociados en Qdrant (purge automático), preservando las validaciones de pertenencia antes de efectos vectoriales.
 - No exigir `agentInstanceId` como filtro en Qdrant (I11)
 
 ### H.5 Skills y Rules
 
-- `bot_resources` / `bot_resource_links` → `SkillConfiguration` y `AgentRules` (por instancia)
-- Cada recurso vinculado a un bot se migra como skill/rule de la instancia correspondiente
-- Sin herencia ni compartición implícita entre instancias (I12, I13)
+- `bot_resources` / `bot_resource_links` se reemplazan por los contratos `SkillConfiguration` y `AgentRules` por instancia.
+- No se migran recursos ni asociaciones legacy; los recursos nuevos se crean y vinculan conforme al catálogo central Waby o al ownership del Workspace.
+- Sin herencia ni compartición implícita entre instancias (I12, I13).
 
-### H.6 MemoryFact
+### H.6 Memoria
 
-- `memory_facts` (30 facts por contacto) → `ConversationMemory` (ventana 20 mensajes user/assistant por conversación)
-- Los facts existentes se pueden conservar como metadata histórica, pero la memoria operativa usa la nueva estructura
-- Sin resumen automático (I14)
+- `MemoryFact` / `MemoryRecord` legacy se retiran; `ConversationMemory` se implementa como recurso nuevo con ventana de 20 mensajes user/assistant por conversación.
+- No se migran ni conservan facts legacy como metadata histórica, dado que la implementación de IA no llegó a producción.
+- Sin resumen automático (I14).
 
 ### H.7 Credenciales
 
-- `aiCredential` per-bot → Eliminado. Credenciales de proveedores LLM gestionadas centralmente por Waby.
-- Los clientes ya no aportan API keys (I6).
+- `aiCredential` per-bot → Eliminado. Era parte del modelo anterior en el que el cliente elegía proveedor LLM y aportaba su API key; no se migra como credencial de AgentDefinition ni de AgentInstance.
+- En el objetivo, Waby gestiona centralmente las credenciales LLM y el routing técnico; `AgentDefinition` referencia `LLMRoute`, que no contiene secretos.
+- Los clientes ya no aportan API keys LLM (I6).
+- Las credenciales de integraciones empresariales son independientes y administradas por usuarios autorizados del Workspace. Su referencia protegida pertenece a `AgentInstanceIntegration`, no a `SkillConfiguration` (D-W79-08).
 
-### H.8 Execution y costos
+### H.8 Ejecuciones y costos
 
-- `execution` → `AgentExecution` + `AgentExecutionLog` (campos I21 adicionales)
-- `execution.cost` (estimación legacy) → `totalCreditsDeducted` (débito real)
-- Campos nuevos: `prompt_snapshot_hash`, `provider_model_used`, `latency_ms`
+- La entidad legacy `Execution` y sus registros se retiran; `AgentExecution` se crea conforme a D-W79-05 (observabilidad técnica diferida por D-W79-13).
+- No se migran ejecuciones ni estimaciones `execution.cost`. Los costes nuevos se registran según los contratos de WAB-85 y el ledger aprobado.
+- Los campos y métricas del nuevo registro se definen en el modelo objetivo, no por ampliación del esquema legacy.
 
-### H.9 Compatibilidad temporal
+### H.9 Retirada de compatibilidad legacy
 
-- Durante la migración, ambos modelos pueden coexistir: los bots existentes siguen funcionando mientras se migran a AgentDefinition/AgentInstance.
-- El frontend debe mostrar solo instancias habilitadas al cliente (no las definiciones).
-- Las APIs internas de ai-service (`/api/bots/*`) se deprecian gradualmente a medida que se migran a las nuevas operaciones GraphQL.
+- No hay período de coexistencia entre Bot/BotInstance y AgentDefinition/AgentInstance ni despliegue gradual condicionado a migración de datos.
+- El frontend consume las operaciones y entidades nuevas: muestra AgentInstances autorizadas al Workspace, no las AgentDefinitions centrales.
+- Las APIs internas legacy (`/api/bots/*`), sus consumidores y los contratos GraphQL asociados se retiran o reemplazan; no se mantienen como fachada de compatibilidad.
 
-### H.10 Backup y rollback
+### H.10 Respaldo y reversión de cambios
 
-- Backup completo de MongoDB (crm + ai_service) antes de iniciar la migración.
-- Backup de vectores Qdrant y buckets MinIO afectados.
-- El backup es un punto de recuperación y evidencia; no autoriza por sí solo restaurar una copia anterior sobre datos que ya recibieron asignaciones o transiciones confirmadas.
-- Antes de activar asignaciones de AgentInstance, puede recuperarse el modelo Bot/BotInstance si se verifican las condiciones previas de H.11. Después de la activación, cualquier rollback debe cumplir las condiciones e invariantes de H.11; si la restauración implica pérdida de asignaciones, historial o cambios concurrentes, se detiene y se corrige hacia adelante.
-- Migración por workspace (por lotes) para reducir riesgo y permitir validación incremental.
+- Los respaldos operativos de MongoDB, Qdrant y MinIO se mantienen como práctica de protección ante cambios destructivos, pero no constituyen un plan de migración del modelo IA legacy.
+- No existe rollback a Bot/BotInstance ni restauración de datos legacy como estrategia de reversión del nuevo dominio.
+- La reversión de cambios que afecten datos CRM reales (incluidas asignaciones humanas de Contacto) debe respetar las invariantes y condiciones específicas de H.11; no debe perder transiciones confirmadas ni sobrescribir cambios concurrentes.
 
 ### H.11 Migración del modelo unificado de Contacto (WAB-78 — orden aprobado)
 
@@ -1774,12 +1890,12 @@ La implementación se organiza por dependencias arquitectónicas. Los estados y 
 
 | Issue | Alcance | Estado |
 |---|---|---|
-| WAB-79 | Dominio, ownership, persistencia e índices | Backlog; bloqueada por WAB-78 |
+| WAB-79 | Dominio, ownership, persistencia e índices | Backlog según el último estado documentado en Linear; dependencia WAB-78 satisfecha. Reconciliación documental D-W79-01..14 completada; implementación no iniciada ni autorizada |
 | WAB-80 | Provisioning y autorización | Backlog |
 | WAB-81 | Runtime y composición de contexto | Backlog |
-| WAB-82 | Knowledge compartido y Skills/Rules por agente | Backlog |
+| WAB-82 | Knowledge compartido; operaciones funcionales de Skills/Rules por agente (persistencia en A2/WAB-79; ver [WAB-79 §1.4](../design/wab-79-dominio-ownership-persistencia.md#14-frontera-de-responsabilidades-a2-wab-79-wab-82--fuente-principal)) | Backlog |
 
-Las decisiones P1/P2/P3 ya no son decisiones de producto pendientes: están sustituidas por ARQ-19/20 y DEC-CM-01..08. P4 está aprobada. Los detalles técnicos pendientes de WAB-78 deben cerrarse antes de autorizar la fase siguiente. No iniciar WAB-79 sin autorización expresa.
+Las decisiones P1/P2/P3 ya no son decisiones de producto pendientes: están sustituidas por ARQ-19/20 y DEC-CM-01..08. P4 está aprobada. WAB-78 quedó Done el 08/11/2026 y su dependencia para WAB-79 está satisfecha. La reconciliación documental D-W79-01..14 está completada; los puntos técnicos aún abiertos deben resolverse mediante decisiones explícitas antes de implementar. La implementación requiere planificación técnica y autorización explícita propias.
 
 ### I.2 No fragmentar artificialmente
 
@@ -1890,14 +2006,14 @@ El trabajo se agrupa por responsabilidad arquitectónica (datos, provisioning, r
 
 ### ADR-005: Instantánea inmutable de configuración efectiva por ejecución (P10)
 
-**Estado:** Principio de snapshot inmutable y trazabilidad por ejecución aprobados. AgentDefinition usa identidad estable sin versiones publicadas (D-W79-01); el versionado/retención de Knowledge y los detalles de persistencia se mantienen según sus contratos específicos.
+**Estado:** Principio de snapshot inmutable y trazabilidad por ejecución aprobados. AgentDefinition usa identidad estable sin versiones publicadas (D-W79-01); LLMRoute es una configuración técnica independiente con revisiones propias (D-W79-03). El versionado/retención de Knowledge se mantiene según su contrato específico.
 **Fecha de decisión:** 03/11/2026
-**Decisión:** Al comenzar cada ejecución, se crea una instantánea inmutable de la configuración efectiva (AgentDefinition por ID estable y configuración vigente, Rules, Skills, capabilities, knowledgeBaseIds y parámetros de ejecución de la AgentInstance). La ejecución en curso conserva sus definiciones hasta finalizar; los cambios posteriores se aplican únicamente a nuevas ejecuciones. AgentDefinition no tiene versiones publicadas: sus cambios autorizados se propagan a todas las instancias vinculadas, y sus estados `suspended`/`retired` bloquean nuevas ejecuciones de todas ellas.
+**Decisión:** En la aceptación durable de una ejecución (persistencia de `AgentExecution` y asignación de `createdAt`, antes del ack del mensaje de entrada), se fija una instantánea inmutable de la configuración efectiva: AgentDefinition por ID estable y configuración funcional vigente; LLMRoute por `llmRouteId` y revisión vigente con provider/model/parámetros efectivos; Rules, Skills, capabilities y `knowledgeBaseIds`. Ese mismo punto fija el contenido de los Skills propios del Workspace que utilizará la ejecución. `startedAt` representa únicamente el primer procesamiento efectivo del worker y no modifica la configuración ya aceptada. AgentInstance no aporta overrides técnicos de proveedor/modelo. Las ejecuciones aceptadas conservan su configuración hasta finalizar; los cambios posteriores se aplican únicamente a nuevas aceptaciones, salvo revocaciones de seguridad explícitas. AgentDefinition no tiene versiones publicadas: sus cambios autorizados se propagan a todas las instancias vinculadas, y sus estados `suspended`/`retired` bloquean nuevas ejecuciones de todas ellas.
 
 Se definen **tres niveles de garantía** para trazabilidad y reproducibilidad:
 
 **Nivel 1 — Reconstrucción de configuración:**
-Permite conocer la configuración efectiva con la que se inició una ejecución. Incluye la identidad estable de AgentDefinition y la configuración efectiva capturada (verificable mediante hash), además de referencias identificables y versionadas de Rules, Skills y SkillConfiguration, capabilities, routing, provider/model y parámetros efectivos. No se exige ni se inventa una versión publicada de AgentDefinition. Se conserva obligatoriamente en `effectiveConfigSnapshot`; `effectiveConfigHash` permite verificar su integridad.
+Permite conocer la configuración efectiva fijada al aceptar una ejecución. Incluye la identidad estable de AgentDefinition y la configuración efectiva capturada (verificable mediante hash), además de referencias identificables de Rules, Skills y SkillConfiguration, capabilities, `LLMRoute` (`llmRouteId` + `version`), provider/model y parámetros efectivos. La trazabilidad respeta el régimen propio de cada recurso: Rules conservan identidad, contenido y atributos efectivos sin revisión/versionado propio; las Skills estándar Waby se identifican por release inmutable; las Skills propias del Workspace se identifican por su identidad estable y el hash del contenido aceptado, sin versión ni historial; `SkillConfiguration` se identifica por su clave lógica y no tiene versionado propio aprobado. No se exige ni se inventa una versión publicada de AgentDefinition. Se conserva obligatoriamente en `effectiveConfigSnapshot`; `effectiveConfigHash` permite verificar su integridad.
 
 **Nivel 2 — Trazabilidad del contexto:**
 Permite conocer qué información se utilizó durante la ejecución y es obligatorio por ejecución:
@@ -1913,15 +2029,15 @@ Permite intentar volver a ejecutar el proceso reconstruyendo el mismo contexto y
 **Alternativas consideradas:**
 1. Relectura de configuración en cada paso del pipeline — Rechazado: riesgo de inconsistencia si la configuración cambia a mitad de ejecución.
 2. Invalidación de caché sin instantánea — Rechazado: una ejecución en curso podría usar configuración nueva a mitad de su procesamiento.
-3. Instantánea inmutable al inicio de cada ejecución — Aceptado: consistencia garantizada durante el ciclo de vida de la ejecución, cambios propagados inmediatamente a nuevas ejecuciones, sin flujo draft/release para el cliente (I17).
+3. Instantánea inmutable en la aceptación durable de cada ejecución (`createdAt`, antes del ack) — Aceptado: consistencia desde la aceptación y durante toda la vida de la ejecución, incluso si permanece en cola antes de `startedAt`; los cambios se aplican a nuevas aceptaciones, sin flujo draft/release para el cliente (I17).
 
 **Consecuencias:**
 - Se definen dos hashes diferenciados:
   - `promptSnapshotHash` (SHA-256 del prompt efectivo construido) — identifica el prompt enviado al modelo.
-  - `effectiveConfigHash` (SHA-256 de la configuración efectiva completa: AgentDefinition.id + valores efectivos capturados, skill IDs+versiones, rule IDs+versiones, capability IDs, provider, modelo y parámetros) — identifica la configuración efectiva.
+  - `effectiveConfigHash` (SHA-256 de la configuración efectiva completa: AgentDefinition.id + valores efectivos capturados, identidad de Skills y su referencia de release Waby o hash de contenido Workspace según corresponda, identidad, contenido y atributos efectivos de Rules (sin versionado propio), identidad de SkillConfiguration, capability IDs, provider, modelo y parámetros) — identifica la configuración efectiva.
 - Se almacena obligatoriamente `effectiveConfigSnapshot` (JSON sin secretos) con las referencias identificables/versionadas de configuración y Knowledge requeridas en los Niveles 1 y 2. La copia adicional de valores efectivos para reproducibilidad técnica (Nivel 3, P7) puede optimizarse por almacenamiento, sin eliminar las referencias obligatorias.
 - Las ejecuciones en curso no se ven afectadas por cambios ordinarios de configuración de AgentDefinition, Rules, Skills o Knowledge mientras están en proceso. Un cambio de estado a `suspended` o `retired` bloquea nuevas ejecuciones asociadas; la cancelación de ejecuciones ya iniciadas requiere una política de seguridad explícita.
-- Requiere almacenar por ejecución la identidad estable y configuración efectiva capturada de AgentDefinition, revisiones de Skills/SkillConfiguration y Rules, y las referencias versionadas de documentos y fragmentos Knowledge efectivamente utilizados.
+- Requiere almacenar por ejecución la identidad estable y configuración efectiva capturada de AgentDefinition; releases de Skills estándar Waby; identidad y hash del contenido de Skills propios del Workspace; identidad de SkillConfiguration; identidad, contenido y atributos efectivos de Rules sin versionado propio; y las referencias/versiones disponibles de documentos y fragmentos Knowledge efectivamente utilizados.
 - Sin flujo draft/release para el cliente (I17).
 - **Trazabilidad RAG (Nivel 2):** `knowledgeBaseIds` identifica las bases habilitadas, pero no el contenido efectivamente recuperado. Se registran obligatoriamente IDs de documentos y fragmentos de Qdrant, versiones disponibles y hashes de los fragmentos incorporados al contexto.
 - **No se incluyen secretos ni valores sensibles en el snapshot.** Las credenciales se referencian por ID de versión.
@@ -1935,18 +2051,18 @@ La secuencia de implementación se mantiene como planificación posterior y debe
 
 | Bloque | Alcance | Estado de planificación |
 |---|---|---|
-| WAB-79 — Fase 3 | Dominio, ownership, persistencia e índices | Backlog; bloqueada por WAB-78 |
+| WAB-79 — Fase 3 | Dominio, ownership, persistencia e índices | Backlog según el último estado documentado en Linear; dependencia WAB-78 satisfecha. Reconciliación documental D-W79-01..14 completada; implementación no iniciada ni autorizada |
 | WAB-80 — Fase 4 | Provisioning y autorización | Backlog |
 | WAB-81 — Fase 5 | Runtime y composición de contexto | Backlog |
-| WAB-82 — Fase 6 | Knowledge compartido y Skills/Rules por agente | Backlog |
+| WAB-82 — Fase 6 | Knowledge compartido; operaciones funcionales de Skills/Rules por agente (persistencia en A2/WAB-79; ver [WAB-79 §1.4](../design/wab-79-dominio-ownership-persistencia.md#14-frontera-de-responsabilidades-a2-wab-79-wab-82--fuente-principal)) | Backlog |
 
-La secuencia y las dependencias operativas se consultan en Linear. No iniciar WAB-79 ni fases posteriores hasta que WAB-78 sea revisada y autorizada expresamente.
+La secuencia y las dependencias operativas se consultan en Linear. La condición previa WAB-78 quedó satisfecha al registrarse Done el 08/11/2026. La reconciliación documental D-W79-01..14 está completada; los puntos técnicos aún abiertos se mantienen identificados en el documento de dominio/ownership y en el diseño de integraciones. La implementación de WAB-79 y las fases posteriores requiere su propia planificación, dependencias verificadas y autorización explícita.
 
 **Decisiones vigentes:** ARQ-19/20/21, DEC-CM-01..08 y P4.
-**Pendientes de contrato para completar WAB-78:**
+**Contratos de WAB-78 cerrados y trabajo técnico diferido:**
 - **ARQ-14 — ownership de persistencia: resuelto en D.1.9 y B.** Se distinguen propietario de negocio, superficie API y servicio persistente para cada entidad y sus proyecciones.
 - **ARQ-22 — entrega asíncrona e idempotencia: resuelto como contrato en D.6.** Se fijan entrega at-least-once, identidades estables, aceptación durable antes del ack, Outbox de resultado con confirmación, deduplicación, recuperación y DLQ. La implementación queda en WAB-81.
-- **Verificación cruzada final:** comprobar que el inventario A.2, diagrama B, matriz D.1.9, D.6, H.1, ADRs y escenarios de integración no se contradigan; no repetir diagnósticos D1–D5 ni reabrir decisiones.
+- **Verificación cruzada final:** la verificación de Fase 2 sobre inventario A.2, diagrama B, matriz D.1.9, D.6, H.1, ADRs y escenarios de integración quedó completada documentalmente el 07/11/2026. La reconciliación cruzada D-W79-01..14 entre dominio/persistencia, Fase 2, catálogo, plan de administración e integraciones quedó completada documentalmente el 09/11/2026. Los puntos técnicos no decididos permanecen explícitos en sus documentos; no repetir diagnósticos D1–D5 ni reabrir decisiones aprobadas.
 
 **Trabajo técnico diferido (no son decisiones de producto pendientes):** la matriz exhaustiva operación × emisor × receptor × audience × scope × claims, rotación/revocación y anti-replay de JWT, autenticación RabbitMQ, pruebas negativas y despliegue de ARQ-21; verificación de transacciones MongoDB Atlas y su implementación para ARQ-06; implementación de invalidación/cancelación y validaciones de vigencia para ARQ-07/08. Se ejecuta en las fases técnicas correspondientes, manteniendo los contratos ya aprobados.
 
@@ -1967,9 +2083,9 @@ La secuencia y las dependencias operativas se consultan en Linear. No iniciar WA
 
 **Ruta canónica prevista:** `projects/agents-multitenant/design/fase-2-diseno-objetivo-y-contratos.md` en `sinies7ro/waby-docs`.
 
-**Estado de cierre documental (09/11/2026):** ARQ-14 y ARQ-22 tienen contrato de diseño documentado en D.1.9/B y D.6. La verificación cruzada entre inventario, diagramas, contratos, ADRs y los 15 escenarios D3 quedó completada documentalmente el 07/11/2026. La reconciliación adicional de D-W79-01 con DEC-CM-01/C9 y P10/C.7 quedó completada el 09/11/2026. Las pruebas de integración no se consideran ejecutadas. WAB-78 figura Done en Linear desde el 08/11/2026; WAB-79 permanece Backlog y no se ha iniciado formalmente.
+**Estado de cierre documental (09/11/2026):** ARQ-14 y ARQ-22 tienen contrato de diseño documentado en D.1.9/B y D.6. La verificación cruzada entre inventario, diagramas, contratos, ADRs y los 15 escenarios D3 quedó completada documentalmente el 07/11/2026. La reconciliación cruzada D-W79-01..14 entre el documento de dominio/ownership, Fase 2, catálogo, plan de administración e integraciones quedó completada documentalmente el 09/11/2026. Las pruebas de integración no se consideran ejecutadas. WAB-78 figura Done en Linear desde el 08/11/2026; WAB-79 constaba Backlog en el último estado de Linear documentado. Su implementación no se ha iniciado ni queda autorizada por esta reconciliación. Los puntos técnicos aún abiertos permanecen registrados en los documentos correspondientes.
 
-**Siguiente paso:** iniciar WAB-79 únicamente mediante autorización explícita y respetando su alcance; D-W79-01 no reabre decisiones ya reconciliadas.
+**Siguiente paso:** revisar y resolver, mediante decisiones explícitas, los puntos técnicos pendientes identificados en WAB-79 antes de preparar su implementación. La consolidación/publicación de estos cambios documentales es una operación separada; la implementación requiere planificación y autorización explícitas. D-W79-01..14 no se reabren por esta etapa.
 
 ---
 *Documento de diseño exclusivamente. No se modifica código, schemas, colecciones, resolvers, endpoints ni infraestructura durante esta fase.*
@@ -2575,25 +2691,29 @@ Eliminar referencias a un `lastFencingToken` global en `OrganizationAICredit` y 
 Los criterios aquí descritos representan contratos de diseño, no evidencia de implementación. Su cumplimiento deberá verificarse mediante pruebas de integración y concurrencia en las fases correspondientes.
 
 
-## Anexo — Contrato de retiro de AgentInstance (reconciliación WAB-79, 11/11/2026)
+## Anexo — Contrato de retiro de AgentInstance (reconciliación WAB-79, 11–12/11/2026)
 
 Este anexo complementa el lifecycle P9 y los contratos CRM/AI Service. El desarrollo normativo y el modelo conceptual completos están en [WAB-79 — Dominio, ownership y persistencia](./wab-79-dominio-ownership-persistencia.md), sección 16. No reabre decisiones previas.
 
 ### A. Autoridad y doble bloqueo
 
-El retiro es lógico, no purga física. CRM es autoridad de asignaciones y propietario único de `RetirementOperation`; el servicio de ejecución es autoridad de admisión. Se usa un `retirementOperationId` estable. `retirement_pending` sólo se alcanza después de confirmación durable de CRM (bloqueo de nuevas asignaciones) y del servicio de ejecución (bloqueo de nuevas ejecuciones). No hay transacción distribuida; las confirmaciones y recuperaciones son idempotentes y consultables por el mismo ID.
+El retiro es lógico, no purga física. CRM es autoridad de asignaciones, propietario único de `RetirementOperation` y propietario de `AgentInstance` (colección `agent_instances` en CRM DB); AI Service es autoridad de admisión y ejecución. Se usa un `retirementOperationId` estable. `retirement_pending` sólo se alcanza después de confirmación durable de CRM (bloqueo de nuevas asignaciones) y de AI Service (bloqueo de nuevas ejecuciones). No hay transacción distribuida; las confirmaciones y recuperaciones son idempotentes y consultables por el mismo ID. AI Service no modifica directamente `AgentInstance.status`.
 
 ### B. Estrategia y ejecuciones aceptadas
 
 Una operación fija una estrategia y destino: `unassign`, `reassign_user` a un usuario del Workspace o `reassign_agent` a otra AgentInstance del Workspace. Destino validado al inicio e inmutable; su cambio de estado posterior no cambia la instrucción ni permite sustitución silenciosa.
 
-Admisión y bloqueo de ejecución compiten atómicamente: si gana aceptación, AgentExecution queda durablemente `pending` y debe terminar; si gana bloqueo, se rechaza la nueva. No se cancelan automáticamente ejecuciones aceptadas.
+Admisión y bloqueo de ejecución compiten atómicamente: si gana aceptación, AgentExecution queda durablemente `pending` y debe terminar; si gana bloqueo, se rechaza la nueva. No se cancelan automáticamente ejecuciones aceptadas. Después del bloqueo, AI Service verifica que no queden ejecuciones `pending` ni `processing` y emite una confirmación durable de drenaje. CRM la persiste en `RetirementOperation.executionDrainConfirmation`, ligada al mismo `retirementOperationId` y al instante del bloqueo (`admissionBlockedAt`); es inmutable e idempotente.
 
-### C. Transiciones y causalidad
+### C. Transiciones, idempotencia y causalidad
 
-CRM drena mediante lotes dinámicos y CAS individual validando asignación actual y `ref_ev_assigned`. Contacto, EvAssigned y Outbox se confirman en transacción por contacto. Una transición concurrente válida que ya sacó el contacto de A se respeta, sin duplicar ni revertir.
+CRM drena mediante lotes dinámicos y CAS individual validando asignación actual y `ref_ev_assigned`. Cada transición se confirma en una transacción MongoDB por contacto que agrupa Contacto, EvAssigned, Outbox y actualización de `RetirementOperation.eventSetRevision`. Una transición concurrente válida que ya sacó el contacto de A se respeta, sin duplicar ni revertir.
 
-Toda transición que saque contactos de A mientras el retiro esté activo queda correlacionada al `retirementOperationId`, sin falsear actor/operación reales. El conjunto esperado se obtiene de EvAssigned correlacionados. AI Service aplica mediante Inbox durable y cursor `previousEvAssignedId` / `lastProcessedEvAssignedId`; en una transacción local actualiza proyección, cursor, Inbox y Outbox de confirmación. Confirmar significa aplicado, no recibido ni publicado; CRM persiste la confirmación idempotentemente por `evAssignedId`.
+La identidad idempotente por contacto es `{retirementOperationId, contacto}`, usando el campo heredado `Evento.contacto`. Se exige índice único parcial para EvAssigned con `retirementOperationId`; no se duplica `contactId`. Los reintentos reutilizan el evento y Outbox existentes sin repetir mutaciones ni incrementar la revisión. Ante resultado incierto de commit, se reintenta el commit de la misma sesión cuando corresponda; si no puede resolverse, se consulta el evento y Outbox persistidos, se relee Contacto y sólo después se decide reintentar. Una ausencia de respuesta no prueba aborto.
+
+Toda transición que saque contactos de A mientras el retiro esté activo queda correlacionada al `retirementOperationId`, sin falsear actor/operación reales. El conjunto esperado se obtiene de EvAssigned correlacionados. AI Service aplica mediante Inbox durable y cursor `previousEvAssignedId` / `lastProcessedEvAssignedId`; en una transacción local actualiza proyección, cursor, Inbox y Outbox de confirmación. Confirmar significa aplicado, no recibido ni publicado.
+
+CRM persiste las confirmaciones de aplicación en la colección `retirement_confirmations`, con `evAssignedId`, `retirementOperationId` y `confirmedAt`; índice único por `evAssignedId` e índice de consulta por operación/evento. Duplicados de la misma operación son idempotentes; una confirmación ajena al conjunto esperado o vinculada a otra operación se trata como inconsistencia. La finalización verifica correspondencia exacta de eventos y confirmaciones, no sólo igualdad de contadores.
 
 ### D. Cierre, recuperación y finalización
 
@@ -2601,5 +2721,7 @@ Cada transición que añade un evento y el cierre del conjunto esperado escriben
 
 Sólo hay una operación no terminal por AgentInstance. La recuperación usa estado `blocked`, `resumeFrom`, códigos de bloqueo, lease y fencing; conserva estrategia, destino, bloqueos y efectos confirmados. Workers obsoletos no escriben con generación vencida.
 
-Se completa únicamente con cero asignaciones actuales, ninguna ejecución aceptada pendiente/en procesamiento, todos los eventos del conjunto cerrado aplicados y confirmados durablemente, y ningún evento causal pendiente en Inbox. Si AI Service no está disponible, se conservan bloqueos y la operación queda en finalización/bloqueada. `SENT` no equivale a aplicado. Los detalles exactos de schema, índices, transporte y retención física quedan para concreción técnica; no se autoriza implementación ni cambios en Linear.
+La finalización exige cero asignaciones actuales, drenaje durable de ejecuciones, todos los eventos del conjunto cerrado aplicados y confirmados, correspondencia exacta de confirmaciones y ningún evento causal pendiente en Inbox. CRM envía entonces una orden durable de finalización por Outbox; AI Service la procesa por Inbox, valida bloqueo y drenaje y emite confirmación terminal durable, sin cambiar `AgentInstance.status`. CRM persiste esa confirmación y, en una misma transacción, cambia `AgentInstance.status` a `retired`, `RetirementOperation.status` a `completed` y establece `completedAt`. La orden y confirmación son idempotentes por `retirementOperationId`.
+
+Si AI Service no está disponible, se conservan bloqueos y la operación queda en finalización/bloqueada. `SENT` no equivale a aplicado ni a retirado. Los detalles exactos de schema físico, transporte y retención física quedan para concreción técnica; no se autoriza implementación ni cambios en Linear.
 

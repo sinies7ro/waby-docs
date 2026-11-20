@@ -1,13 +1,14 @@
 # Administración y evolución del catálogo de agentes y Skills de Waby
 
-**Estado:** dirección general de actualización acordada; quedan pendientes los contratos detallados de compatibilidad, notificación, rollout y excepciones de seguridad. No define todavía el catálogo inicial ni el modelo persistente.  
+**Estado:** dirección general de actualización acordada; quedan pendientes los contratos detallados de compatibilidad, notificación, rollout y excepciones de seguridad. No define todavía el catálogo inicial ni el modelo persistente.
+**Alcance:** este plan regula exclusivamente las AgentDefinitions y Skills estándar administradas por Waby. No regula el ciclo de vida de Skills propias del Workspace, que tienen contenido vigente único, sin historial ni rollback conforme a D-W79-10.
 **Fecha:** 05/11/2026.  
-**Fase:** WAB-78 — dejar preparado el enfoque para una etapa posterior de diseño e implementación.  
+**Origen:** enfoque preparado durante WAB-78 y reconciliado con las decisiones D-W79-01/D-W79-10. Este documento define la política del catálogo Waby; no autoriza implementación.
 **Principio:** Waby administra y mejora el catálogo; los clientes utilizan agentes actualizados sin gestionar versiones técnicas.
 
 ## 1. Decisión de enfoque
 
-No conviene cerrar ahora el listado inicial de categorías, plantillas y Skills. El diseño de experiencia y la arquitectura todavía se están cerrando, y el sistema no está implementado. Crear hoy un inventario detallado tendría alto riesgo de anticipar decisiones que luego cambien.
+Al elaborar este plan (05/11/2026), no convenía cerrar todavía el listado inicial de categorías, plantillas y Skills: el diseño de experiencia y la arquitectura seguían en definición y el sistema no estaba implementado. Por eso se pospuso el inventario detallado para evitar anticipar decisiones que luego pudieran cambiar. Esta nota conserva el contexto histórico; no describe el estado actual de la reconciliación documental.
 
 Sí conviene definir desde ahora **cómo Waby será dueño del catálogo, cómo lo crea, valida, publica, actualiza y retira**. El inventario inicial se elaborará más cerca de la implementación y con criterios de producto/UX y pruebas reales.
 
@@ -20,19 +21,19 @@ Los clientes no administran el catálogo central ni necesitan comprender su vers
 
 ## 2. ¿Por qué conservar versiones?
 
-**Sí: las versiones deben conservarse internamente**, aunque no sean una opción que el usuario final tenga que elegir.
+**Las releases inmutables se conservan para las Skills estándar administradas por Waby.** Esta política no introduce versiones publicadas de `AgentDefinition`: conforme a D-W79-01, cada AgentDefinition mantiene una identidad estable y una única configuración funcional vigente, cuyos cambios autorizados se aplican a nuevas ejecuciones de todas las AgentInstances vinculadas.
 
-Razones:
+Para las Skills estándar, las releases permiten:
 
-1. **Reproducibilidad y auditoría:** permite conocer exactamente qué instrucciones/Skill recibió una ejecución.
-2. **P10:** cada ejecución conserva una configuración efectiva inmutable. Para que ese snapshot sea verificable debe identificar una versión exacta de cada Skill estándar utilizada.
-3. **Calidad:** permite comparar comportamiento antes/después, reproducir regresiones y ejecutar pruebas sobre una release concreta.
-4. **Seguridad:** permite identificar releases afectadas, bloquearlas y desplegar una corrección controlada.
-5. **Rollback:** permite volver a una release anterior cuando existe una regresión, siempre que no sea vulnerable ni haya sido retirada por seguridad.
+1. **Reproducibilidad y auditoría:** conocer exactamente qué contenido de Skill recibió una ejecución.
+2. **P10:** identificar en el snapshot la release exacta de cada Skill estándar utilizada.
+3. **Calidad:** comparar comportamiento antes/después, reproducir regresiones y ejecutar pruebas sobre una release concreta.
+4. **Seguridad:** identificar releases afectadas, bloquearlas y desplegar una corrección controlada.
+5. **Rollback:** volver a una release anterior cuando existe una regresión, siempre que no sea vulnerable ni haya sido retirada por seguridad.
 
-Las versiones publicadas deben ser inmutables. Una corrección no modifica una versión ya publicada: crea una nueva release.
+Las releases publicadas de Skills deben ser inmutables. Una corrección no modifica una release ya publicada: crea otra nueva. Esta regla no se aplica como versionado de AgentDefinition ni al contenido propio del Workspace.
 
-No es necesario imponer Semantic Versioning ni mostrar números de versión al cliente desde el inicio. En la primera etapa puede bastar con un identificador interno único, fecha, estado, huella de contenido, compatibilidad y notas de cambio. La convención de numeración se definirá cuando se diseñe el catálogo real.
+No es necesario imponer Semantic Versioning ni mostrar números de release al cliente desde el inicio. En la primera etapa puede bastar con un identificador interno único, fecha, estado, huella de contenido, compatibilidad y notas de cambio para cada release de Skill. La convención de numeración se definirá cuando se diseñe el catálogo real.
 
 ## 3. El cliente no administra versiones: política de actualización gestionada por Waby
 
@@ -85,13 +86,13 @@ La propuesta de resolución es:
 - AgentDefinition referencia Skills por ID estable y declara si se incluyen por defecto o se recomiendan.
 - AgentInstance conserva sus elecciones empresariales: Skill habilitada/deshabilitada y configuración propia permitida; no necesita administrar números de versión.
 - El catálogo resuelve la release aprobada por Waby para esa instancia/canal.
-- Al comenzar una ejecución, P10 captura el identificador/hash exacto de la release utilizada.
+- En la aceptación durable de la ejecución (`AgentExecution.createdAt`, antes del ack), P10 captura el identificador/hash exacto de la release utilizada, junto con el resto de la configuración efectiva.
 - Las ejecuciones siguientes resuelven la release estable vigente según el rollout y la política de seguridad.
 - Los cambios de catálogo no reescriben snapshots de ejecuciones anteriores.
 
 La transición automática de release no debe confundirse con cambiar la selección empresarial: actualizar el procedimiento de una Skill habilitada no debe habilitar Skills nuevas, ampliar permisos ni conectar integraciones por sí mismo.
 
-Los cambios de una AgentDefinition (composición, selección de Skills, capacidades compatibles, configuración base) se gestionan como actualización del catálogo de plantillas y requieren una política de rollout propia. No deben sobrescribir personalizaciones empresariales. Las políticas obligatorias de Waby y los bloqueos de seguridad siempre prevalecen.
+Los cambios de una AgentDefinition (composición, selección recomendada de Skills, capacidades compatibles y configuración base) actualizan su configuración funcional vigente bajo el mismo ID estable; no crean una versión publicada de AgentDefinition. Su propagación a nuevas ejecuciones de las instancias vinculadas debe respetar las personalizaciones empresariales y no habilitar silenciosamente Skills, permisos ni integraciones. Las políticas obligatorias de Waby y los bloqueos de seguridad siempre prevalecen.
 
 ## 5. Proceso futuro para que Waby administre el catálogo
 
@@ -101,7 +102,7 @@ Se propone un flujo interno, operado por personal autorizado de Waby, no por los
 
 - Crear una AgentDefinition o Skill en estado de borrador.
 - Registrar objetivo, alcance, casos de uso y exclusiones.
-- Definir versión/release, entradas, resultados esperados, instrucciones, compatibilidades y relaciones con otras Skills/capabilities.
+- Para una Skill estándar, definir su release inmutable, entradas, resultados esperados, instrucciones, compatibilidades y relaciones con otras Skills/capabilities. Para una AgentDefinition, mantener su identidad estable y documentar la configuración funcional vigente sin crear versiones publicadas.
 - Identificar riesgos, datos utilizados y si la Skill puede influir en decisiones de derivación o acciones externas.
 
 ### B. Revisión y validación
@@ -168,9 +169,9 @@ No definir todavía:
 - Porcentajes/ventanas del rollout y métricas numéricas de promoción.
 - Política detallada para cambios funcionales incompatibles.
 - Modelo final de actualización de AgentDefinitions existentes.
-- Contrato detallado de Skills propias de cada empresa.
+- Entidad/ubicación física del contenido fuente de Skills propias del Workspace y su vínculo con `SkillConfiguration` (la identidad, ownership y política de actualización ya están fijados por D-W79-09/D-W79-10).
 
-Estos puntos se definirán cuando estén cerrados el diseño de experiencia, el contrato de configuración efectiva y la estrategia de implementación. El objetivo ahora es preservar la decisión arquitectónica de versionado interno y actualización gestionada.
+Estos puntos se definirán cuando estén cerrados el diseño de experiencia, el contrato de configuración efectiva y la estrategia de implementación. El versionado interno, las releases inmutables y la actualización gestionada descritos en este plan corresponden al catálogo estándar administrado por Waby; no se extienden a los Skills propios del Workspace, cuyo ciclo de vida quedó definido por D-W79-10.
 
 ## 8. Relación con decisiones previas
 
@@ -180,4 +181,6 @@ Estos puntos se definirán cuando estén cerrados el diseño de experiencia, el 
 - AgentInstance pertenece al Workspace y conserva la personalización empresarial.
 - Las integraciones son opcionales. La conexión externa, sus credenciales y operaciones se asocian a cada AgentInstance dentro de su Workspace y son configuradas por usuarios autorizados del Workspace; Waby administra los conectores/ejecutores y la Organización conserva el ámbito superior de tenancy y el plan comercial.
 - Las políticas de seguridad y revocaciones urgentes prevalecen sobre releases antiguas.
-- No se cierra WAB-78 ni se inicia WAB-79 con este plan.
+- D-W79-12 define `AgentRules` como configuración por AgentInstance sin versionado propio; no modifica el régimen de releases inmutables de las Skills estándar administradas por Waby.
+- D-W79-13 (observabilidad de ejecuciones) y D-W79-14 (`EvAssigned`) quedan fuera del alcance de este plan de catálogo.
+- Este plan no reabre WAB-78 ni autoriza la implementación de WAB-79. La reconciliación documental D-W79-01..14 está completada en los documentos de diseño; los puntos técnicos pendientes permanecen sujetos a decisiones explícitas.

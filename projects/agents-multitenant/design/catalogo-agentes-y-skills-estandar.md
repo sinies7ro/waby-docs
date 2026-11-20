@@ -70,7 +70,7 @@ Una misma Skill puede ser referenciada por varias configuraciones de agente. No 
 - Una Skill nueva, o una Skill incorporada posteriormente a las recomendaciones de una AgentDefinition, no se habilita automáticamente en instancias existentes. Se informa como opción y requiere que el usuario decida habilitarla.
 - P10 registra en cada ejecución la release exacta de Skill utilizada. Las ejecuciones anteriores conservan su snapshot; las siguientes pueden utilizar la release estable promovida por Waby.
 - Las actualizaciones de seguridad pueden bloquear/revocar releases vulnerables y prevalecen sobre la continuidad de versiones anteriores.
-- La empresa puede agregar procedimientos o instrucciones propios. Se distinguen de las Skills estándar, se revisan/versionan internamente como parte de la configuración de instancia y no se convierten en código ejecutable ni conceden permisos por sí mismos.
+- La empresa puede crear Skills propias dentro de su Workspace. Se distinguen de las Skills estándar Waby, tienen un único contenido vigente y no conservan historial de versiones ni rollback. Una actualización afecta a ejecuciones cuyo inicio lógico (aceptación durable, `createdAt`) sea posterior; las ya aceptadas terminan con la copia consistente fijada para ellas, aunque el worker todavía no haya registrado `startedAt`. El hash usado permite trazabilidad, pero no recuperar el contenido anterior. Estas Skills no se convierten en código ejecutable ni conceden permisos por sí mismas.
 - Una actualización que cambie sustancialmente el propósito o alcance de una Skill no se trata como una mejora compatible de la misma Skill: debe gestionarse como una nueva opción o un cambio de configuración que requiera decisión explícita.
 
 La política operativa completa (autoría, pruebas, aprobación, rollout, rollback, retirada y seguridad) está en [Plan de administración y evolución del catálogo](./plan-administracion-catalogo-waby.md).
@@ -150,7 +150,7 @@ Las opciones avanzadas y las integraciones se ofrecen cuando tienen sentido, nun
 - Este documento registra la dirección de producto aprobada, no un catálogo inicial cerrado ni el número definitivo de categorías/Skills.
 - Falta definir el ciclo editorial y de publicación del catálogo Waby, responsables, pruebas, compatibilidad y retiro de versiones.
 - Falta definir cómo se presentan las Skills recomendadas/disponibles durante la configuración inicial y cómo se comunican las nuevas opciones sin habilitarlas automáticamente.
-- Falta precisar el modelo de procedimientos empresariales propios y su versionado.
+- Queda pendiente definir la entidad/ubicación física del contenido fuente de las Skills propias y su vínculo con `SkillConfiguration`; su identidad, ownership y ciclo de actualización ya están fijados por D-W79-09/D-W79-10.
 - Falta diseñar los umbrales, señales, explicaciones y controles configurables para la detección de malestar.
 - Falta diseñar la política exacta para transferencia automática versus recomendación/confirmación, coordinada con P2 y permisos.
 - Falta establecer retención y visibilidad de las señales de malestar, minimizando datos persistentes.
@@ -160,9 +160,11 @@ Las opciones avanzadas y las integraciones se ofrecen cuando tienen sentido, nun
 
 - La propiedad de AgentDefinition y las políticas centrales sigue siendo de Waby.
 - AgentInstance sigue perteneciendo al Workspace.
-- Skills estándar son administradas/versionadas por Waby; procedimientos empresariales pertenecen al alcance de la instancia y no otorgan capacidades.
+- Skills estándar son administradas/versionadas por Waby mediante releases inmutables; Skills propias pertenecen al Workspace, mantienen un único contenido vigente sin historial/rollback y no otorgan capacidades.
 - Las conexiones externas, sus referencias seguras a credenciales y las operaciones habilitadas se asocian a cada AgentInstance y quedan dentro de su Workspace. Usuarios autorizados del Workspace las configuran; Waby administra conectores/ejecutores y la Organización conserva el ámbito superior de tenancy y el plan comercial.
 - Las integraciones son opcionales: el agente funciona con instrucciones y Knowledge.
 - P10 sigue vigente: cada ejecución conserva un snapshot efectivo inmutable.
 - Las reglas aprobadas de routing/delegación de P2 gobiernan la transferencia a humanos/equipos.
-- CTX-P3/CTX-P4 están aprobados como dirección y contrato conceptual; este documento desarrolla el catálogo sin modificar ese contrato. Esta definición no cierra WAB-78 ni autoriza iniciar WAB-79.
+- `AgentRules` es configuración propia de cada AgentInstance y, conforme a D-W79-12, mantiene identidad estable y contenido vigente único sin versionado, historial ni rollback; no altera el régimen de releases inmutables de Skills estándar descrito en este catálogo.
+- D-W79-13 (observabilidad de ejecuciones) y D-W79-14 (`EvAssigned`) pertenecen a otros contratos y no modifican el ownership ni el ciclo de vida del catálogo Waby.
+- CTX-P3/CTX-P4 están aprobados como dirección y contrato conceptual; este documento desarrolla el catálogo sin modificar ese contrato. WAB-78 está cerrado; este documento no autoriza implementación de WAB-79 ni modifica su alcance. El diseño/reconciliación documental de WAB-79 se gestiona en sus documentos propios.
