@@ -1,6 +1,6 @@
 # WABY Platform Admin — Diseño arquitectónico y plan de construcción
 
-> **Estado:** diseño funcional y arquitectónico aprobado; formalización y planificación en Linear pendientes.  
+> **Estado:** diseño funcional y arquitectónico aprobado; proyecto y backlog formalizados en Linear.  
 > **Tipo:** construcción nueva e independiente.  
 > **Fecha de consolidación:** 2026-11-26.  
 > **Fuente documental:** `sinies7ro/waby-docs`.
@@ -18,7 +18,7 @@ El objetivo de este documento es consolidar el diseño aprobado antes de iniciar
 | Componente | Responsabilidad | Tecnología acordada |
 |---|---|---|
 | `fr-platform-waby` | Interfaz administrativa de la plataforma | React |
-| `bk-platform-waby` | Identidad, autenticación, autorización global, catálogo, coordinación y auditoría | Node.js, TypeScript, Express |
+| `bk-platform-waby` | Identidad, autenticación, autorización global, catálogo, coordinación y auditoría | Node.js, TypeScript, Express, Docker |
 | Persistencia central | Administradores, servicios, grants, sesiones y auditoría | MongoDB |
 | ODM | Modelado y acceso a MongoDB | Mongoose + Typegoose |
 | Mensajería | Eventos, sincronización y reintentos | RabbitMQ |
@@ -47,6 +47,7 @@ La selección de GraphQL es opcional por operación: REST/Express será el mecan
 8. **Sin registro público:** las cuentas se crean mediante operaciones autorizadas o el bootstrap inicial.
 9. **Independencia de despliegue:** frontend y backend administrativos tienen ciclos de despliegue propios.
 10. **Fail-closed:** un grant pendiente o fallido no habilita acceso; los controles de identidad, sesión y autorización no deben degradarse a acceso permisivo.
+11. **Backend contenerizado:** `bk-platform-waby` se construye y ejecuta como contenedor Docker; la imagen es un artefacto de despliegue independiente.
 
 ## 3. Identidad y ciclo de vida de administradores
 
@@ -398,15 +399,34 @@ Frontend y backend se despliegan de manera independiente, con ciclos de vida pro
 - Servicios: comunicación interna autenticada.
 - Los dominios definitivos y la topología concreta quedan pendientes del diseño de despliegue.
 
+### 11.4. Dockerización de Platform Backend
+
+`bk-platform-waby` debe estar dockerizado desde su fundación y ejecutarse como contenedor Docker en los entornos previstos. Docker forma parte del modo de empaquetado y despliegue del backend, no es una mejora opcional posterior.
+
+Requisitos mínimos:
+
+- Mantener un `Dockerfile` versionado en el repositorio del backend.
+- Construir una imagen reproducible, preferentemente mediante build multi-stage, separando dependencias de compilación y runtime.
+- Ejecutar el proceso con un usuario no privilegiado.
+- No copiar secretos, archivos `.env` reales, credenciales ni claves privadas dentro de la imagen.
+- Inyectar configuración y secretos en tiempo de ejecución mediante el mecanismo de secretos/configuración del entorno.
+- Definir correctamente el comando de arranque y el manejo de señales para cierre ordenado.
+- Incorporar health check del servicio y documentar cómo se comprueba la disponibilidad.
+- Mantener `.dockerignore` para excluir dependencias locales, artefactos, archivos sensibles y contenido innecesario.
+- Documentar build, ejecución local y configuración de los contenedores por entorno.
+- La imagen debe poder desplegarse independientemente de CRM y del frontend administrativo.
+
+La estrategia concreta de orquestación y el uso de Docker Compose en desarrollo se definirán según la topología de infraestructura; este requisito no presupone que Compose sea el orquestador de producción.
+
 ## 12. Construcción y etapas de trabajo
 
 El diseño se considera cerrado a nivel de prioridades. La implementación debe planificarse como una construcción nueva, con entregables verificables y dependencias explícitas.
 
 Secuencia de trabajo recomendada para el proyecto independiente:
 
-1. **Formalización del proyecto:** crear proyecto independiente en Linear, registrar alcance, decisiones aprobadas, responsables, dependencias y roadmap. No crear un issue hijo de WAB-78/WAB-81.
+1. **Formalización del proyecto:** proyecto independiente creado en Linear; alcance, decisiones aprobadas, responsable, dependencias y roadmap registrados. No crear un issue hijo de WAB-78/WAB-81.
 2. **Contratos detallados:** cerrar esquemas de API, errores, versionado de catálogos, autorización central, eventos, idempotencia y protocolo técnico entre servicios.
-3. **Fundación de Platform Backend:** configuración, MongoDB, bootstrap, identidad, contraseñas, JWT/JWKS y sesiones.
+3. **Fundación de Platform Backend:** repositorio y aplicación, Dockerfile e imagen Docker, configuración, MongoDB, bootstrap, identidad, contraseñas, JWT/JWKS y sesiones.
 4. **Autorización y administración:** roles centrales, administración de administradores, grants y auditoría.
 5. **Integración de servicios:** contrato interno, validación local, aprovisionamiento, revocación, RabbitMQ, reintentos y reconciliación.
 6. **Platform Frontend:** login, sesiones, administración de administradores, catálogo de servicios y gestión de accesos.
@@ -444,7 +464,7 @@ Estos pendientes no reabren las decisiones de arquitectura ya aprobadas; son esp
 
 **Estado de construcción:** todavía no iniciada.  
 **Repositorios de implementación:** previstos, no creados ni modificados por este documento.  
-**Linear:** proyecto independiente pendiente de creación y formalización.  
+**Linear:** proyecto independiente creado y backlog inicial formalizado; responsable único asignado.  
 **Implementaciones existentes:** no se modifican como parte de esta consolidación.
 
 Este documento es la referencia arquitectónica inicial de WABY Platform Admin. Las decisiones futuras deben actualizarse aquí y registrarse en el proyecto independiente de Linear, preservando la separación con la iniciativa de agentes multitenant.
