@@ -31,6 +31,8 @@ projects/
     architecture/
     contracts/
     plans/
+  platform-admin/
+    README.md
 templates/
 ```
 
