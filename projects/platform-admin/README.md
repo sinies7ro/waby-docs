@@ -456,8 +456,8 @@ La implementación debe seguir el contrato v1. Una modificación incompatible re
 - Contratos técnicos v1: **cerrados** y publicados en [contracts/technical-contracts-v1.md](contracts/technical-contracts-v1.md).
 
 **Estado de construcción:** iniciada — PA-02 / WAB-113 en curso.  
-**Backend:** [ElemeSoft/bk-platform-waby](https://github.com/ElemeSoft/bk-platform-waby), repositorio privado creado y fundación inicial publicada en el commit `60bbb47`.  
-**Frontend:** [ElemeSoft/fr-platform-waby](https://github.com/ElemeSoft/fr-platform-waby), repositorio privado creado; implementación aún no iniciada.  
+**Backend:** [ElemeSoft/bk-platform-waby](https://github.com/ElemeSoft/bk-platform-waby), repositorio privado creado y fundación inicial publicada en `60bbb47` y pipeline CI añadido en `c85c8c5`.  
+**Frontend:** [ElemeSoft/fr-platform-waby](https://github.com/ElemeSoft/fr-platform-waby), repositorio privado creado; alcance documentado en `eba3c59`; implementación aún no iniciada.  
 **Linear:** proyecto independiente formalizado. PA-01 (WAB-102 y WAB-108 a WAB-112) completado; PA-02 (WAB-103) y su fundación (WAB-113) en curso.  
 **Verificaciones locales:** typecheck, lint, 3 tests y build pasan. La construcción de imagen Docker está pendiente de disponibilidad del Docker Engine local; se incorporó un job CI para verificar también el build de imagen en GitHub Actions.  
 **Implementaciones existentes:** no se modifican como parte de esta iniciativa.
