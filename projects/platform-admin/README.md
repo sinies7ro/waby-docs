@@ -453,10 +453,13 @@ La implementación debe seguir el contrato v1. Una modificación incompatible re
 - Prioridad 3 — Integración y sincronización con servicios: **aprobada**.
 - Prioridad 4 — Administración de administradores y recuperación: **aprobada**.
 - Prioridad 5 — Auditoría, despliegue e infraestructura: **aprobada**.
+- Contratos técnicos v1: **cerrados** y publicados en [contracts/technical-contracts-v1.md](contracts/technical-contracts-v1.md).
 
-**Estado de construcción:** todavía no iniciada.  
-**Repositorios de implementación:** previstos, no creados ni modificados por este documento.  
-**Linear:** proyecto independiente creado y backlog inicial formalizado; responsable único asignado.  
-**Implementaciones existentes:** no se modifican como parte de esta consolidación.
+**Estado de construcción:** iniciada — PA-02 / WAB-113 en curso.  
+**Backend:** [ElemeSoft/bk-platform-waby](https://github.com/ElemeSoft/bk-platform-waby), repositorio privado creado y fundación inicial publicada en el commit `60bbb47`.  
+**Frontend:** [ElemeSoft/fr-platform-waby](https://github.com/ElemeSoft/fr-platform-waby), repositorio privado creado; implementación aún no iniciada.  
+**Linear:** proyecto independiente formalizado. PA-01 (WAB-102 y WAB-108 a WAB-112) completado; PA-02 (WAB-103) y su fundación (WAB-113) en curso.  
+**Verificaciones locales:** typecheck, lint, 3 tests y build pasan. La construcción de imagen Docker está pendiente de disponibilidad del Docker Engine local; se incorporó un job CI para verificar también el build de imagen en GitHub Actions.  
+**Implementaciones existentes:** no se modifican como parte de esta iniciativa.
 
 Este documento es la referencia arquitectónica inicial de WABY Platform Admin. Las decisiones futuras deben actualizarse aquí y registrarse en el proyecto independiente de Linear, preservando la separación con la iniciativa de agentes multitenant.
