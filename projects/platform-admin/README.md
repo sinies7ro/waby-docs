@@ -435,24 +435,16 @@ Secuencia de trabajo recomendada para el proyecto independiente:
 
 El orden es una propuesta de ejecución; el desglose definitivo y las dependencias se registran en Linear antes de comenzar a implementar.
 
-## 13. Pendientes de especificación antes de implementación
+## 13. Estado de especificación técnica
 
-El diseño de alto nivel está aprobado, pero estos detalles requieren contrato técnico explícito. No deben resolverse mediante supuestos durante la implementación:
+Los doce pendientes iniciales de especificación fueron concretados en el contrato técnico v1:
 
-1. Permisos globales exactos de Platform Admin y matriz de autorización central.
-2. Comportamiento de grants existentes cuando un servicio se deshabilita en el catálogo central.
-3. Esquemas request/response, errores, versionado y códigos de estado de los endpoints internos.
-4. Mecanismo local concreto de revocación de sesión por `sid`, expiración de su estado y objetivo temporal de propagación.
-5. Política exacta de cookies (`SameSite`, dominio y protección CSRF) según los dominios definitivos.
-6. Contrato de autenticación técnica: emisión, distribución, rotación y revocación de credenciales de servicio.
-7. Catálogo de acciones de auditoría, estructura permitida de metadata, controles de integridad y revisión legal de retención.
-8. Procedimiento operativo detallado para recuperación de emergencia del único SuperAdmin.
-9. Parámetros de Argon2id, rate limiting y detección de contraseñas comprometidas.
-10. Topología final, dominios, entornos, backups, restauración y gestión de secretos.
-11. Estrategia exacta de bootstrap y eliminación/expiración del secreto de inicialización.
-12. Catálogo inicial de servicios que participarán y su rol máximo `isPlatformAdminRole`.
+[`contracts/technical-contracts-v1.md`](contracts/technical-contracts-v1.md).
 
-Estos pendientes no reabren las decisiones de arquitectura ya aprobadas; son especificaciones necesarias para convertirlas en contratos implementables.
+El contrato cierra autorización global, grants ante deshabilitación de servicios, REST interno, identidad técnica, revocación local de sesiones, cookies/CSRF, auditoría, parámetros de contraseñas, recuperación de emergencia, bootstrap y catálogo inicial. Los valores de dominios, hosts, secretos de proveedor y topología física permanecen parametrizados por entorno; la incorporación efectiva de cada servicio depende de que implemente y supere la validación del contrato v1.
+
+La implementación debe seguir el contrato v1. Una modificación incompatible requiere decisión explícita, actualización documental y trazabilidad en Linear.
+
 
 ## 14. Estado y trazabilidad
 
