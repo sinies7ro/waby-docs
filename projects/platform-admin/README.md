@@ -455,11 +455,18 @@ La implementación debe seguir el contrato v1. Una modificación incompatible re
 - Prioridad 5 — Auditoría, despliegue e infraestructura: **aprobada**.
 - Contratos técnicos v1: **cerrados** y publicados en [contracts/technical-contracts-v1.md](contracts/technical-contracts-v1.md).
 
-**Estado de construcción:** iniciada — PA-02 / WAB-113 en curso.  
-**Backend:** [ElemeSoft/bk-platform-waby](https://github.com/ElemeSoft/bk-platform-waby), repositorio privado creado y fundación inicial publicada en `60bbb47`, pipeline CI en `c85c8c5` y smoke test Docker en `f32c82c`.  
-**Frontend:** [ElemeSoft/fr-platform-waby](https://github.com/ElemeSoft/fr-platform-waby), repositorio privado creado; alcance documentado en `eba3c59`; implementación aún no iniciada.  
-**Linear:** proyecto independiente formalizado. PA-01 (WAB-102 y WAB-108 a WAB-112) completado; PA-02 (WAB-103) en curso; su fundación (WAB-113) completada y persistencia/bootstrap (WAB-114) como siguiente entrega.  
-**Verificaciones locales:** typecheck, lint, 3 tests y build pasan. La construcción de imagen Docker está pendiente de disponibilidad del Docker Engine local; se incorporó un job CI para verificar también el build de imagen en GitHub Actions.  
+**Estado de construcción:** PA-02 / WAB-103 continúa en curso. WAB-113 (fundación) y WAB-114 (persistencia de administradores y bootstrap seguro) están implementados localmente.
+
+**Backend:** [ElemeSoft/bk-platform-waby](https://github.com/ElemeSoft/bk-platform-waby). La fundación publicada permanece en `f32c82c`. WAB-114 está en el commit local `ca57c3680e5929e3c11cf495e302638e51c90050` (`feat(platform-admin): implement admin persistence and secure bootstrap`), con 34 archivos. Ese commit no se ha publicado; `origin/master` continúa en `f32c82c` y la CI remota del commit queda pendiente.
+
+**Verificaciones WAB-114:** typecheck, lint, build y `git diff --check` correctos; 28/28 pruebas en 8 archivos; integración/concurrencia 14/14; Docker build y smoke de readiness positiva, pérdida de MongoDB, readiness 503 y cierre SIGTERM correctos.
+
+**Ejecución local:** se preparó un Compose independiente en `bk-platform-waby/compose.yaml`, conectado a la base lógica `platform_admin` de MongoDB Atlas. La validación de Compose/build se registra en el repositorio backend; la conexión real con Atlas requiere completar la URI local y no se ha verificado desde este documento. El bootstrap sigue siendo una tarea explícita y nunca se ejecuta al iniciar HTTP.
+
+**Frontend:** [ElemeSoft/fr-platform-waby](https://github.com/ElemeSoft/fr-platform-waby), repositorio privado creado; alcance documentado en `eba3c59`; implementación aún no iniciada.
+
+**Linear:** PA-01 completado; PA-02 en curso. WAB-114 se registra como implementación local completada, con publicación y CI remota pendientes. La siguiente entrega de backend será WAB-115 (autenticación humana y sesiones).
+
 **Implementaciones existentes:** no se modifican como parte de esta iniciativa.
 
 Este documento es la referencia arquitectónica inicial de WABY Platform Admin. Las decisiones futuras deben actualizarse aquí y registrarse en el proyecto independiente de Linear, preservando la separación con la iniciativa de agentes multitenant.
